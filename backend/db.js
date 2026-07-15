@@ -22,7 +22,7 @@ async function initDb() {
     const client = new Client(pgConfig);
     await client.connect();
     console.log("PostgreSQL server found.");
-    
+
     // Create database if not exists
     const res = await client.query("SELECT 1 FROM pg_database WHERE datname='metamorphosis'");
     if (res.rowCount === 0) {
@@ -30,7 +30,7 @@ async function initDb() {
       await client.query("CREATE DATABASE metamorphosis");
     }
     await client.end();
-    
+
     // Reconnect to metamorphosis database
     const appPgConfig = { ...pgConfig, database: 'metamorphosis' };
     pgClient = new Client(appPgConfig);
@@ -86,7 +86,7 @@ async function runExec(sql, params = []) {
     return { insertId: res.rows && res.rows[0] ? res.rows[0].id : null, rowsAffected: res.rowCount };
   } else {
     return new Promise((resolve, reject) => {
-      sqliteDb.run(sql, params, function(err) {
+      sqliteDb.run(sql, params, function (err) {
         if (err) reject(err);
         else resolve({ insertId: this.lastID, rowsAffected: this.changes });
       });
@@ -1207,7 +1207,7 @@ async function runMigrations() {
   await addCol('fabric_booking_items', 'amount', numType);
   await addCol('fabric_booking_items', 'yarn_tag', textType);
   await addCol('fabric_booking_items', 'garments_cert', textType);
-  
+
   await addCol('trims_bookings', 'booking_label', textType);
   await addCol('trims_bookings', 'terms_conditions', textType);
   await addCol('trims_bookings', 'company', textType);
@@ -1288,7 +1288,7 @@ async function seedData() {
   const count = parseInt(existingBuyers[0].count);
   if (count === 0) {
     console.log("Seeding initial master data...");
-    
+
     // Seed Buyers
     await runExec("INSERT INTO buyers (name, code, brand, buying_agent, team_leader, season) VALUES (?, ?, ?, ?, ?, ?)",
       ['Zara', 'ZR', 'Zara Kids', 'Inditex Agent', 'John Doe', 'Summer 2026']);
@@ -1304,7 +1304,7 @@ async function seedData() {
       ['Knit Polo Shirt', 'Casual Basic', 'Jersey', 'Pcs', 14.0]);
     await runExec("INSERT INTO items_master (item_name, item_group, category, uom, smv) VALUES (?, ?, ?, ?, ?)",
       ['Girls Swimming Costume', 'Fashion', 'Lingerie', 'Pcs', 16.5]);
-      
+
     console.log("Seeding complete.");
   }
 
@@ -1313,7 +1313,7 @@ async function seedData() {
   const budgetCount = parseInt(existingBudgets[0].count);
   if (budgetCount === 0) {
     console.log("Seeding detailed mock budget in db...");
-    
+
     // Insert budget
     await runExec(
       `INSERT INTO budgets (
@@ -1347,7 +1347,7 @@ async function seedData() {
     const seeded = await runQuery("SELECT id FROM budgets WHERE budget_reference = 'BG-ZR-polo-001'");
     if (seeded && seeded.length > 0) {
       const budgetId = seeded[0].id;
-      
+
       // Seed fabric line
       await runExec(
         `INSERT INTO budget_fabric_costs (
@@ -1363,12 +1363,12 @@ async function seedData() {
           0.22, 0.44, 25200, 5544.0
         ]
       );
-      
+
       // Get inserted fabric id
       const fSeeded = await runQuery("SELECT id FROM budget_fabric_costs WHERE budget_id = ?", [budgetId]);
       if (fSeeded && fSeeded.length > 0) {
         const fId = fSeeded[0].id;
-        
+
         // Seed yarns
         await runExec(
           `INSERT INTO budget_yarn_costing (
@@ -1380,7 +1380,7 @@ async function seedData() {
             'Solid', 25200, 0, 'Toma', 0.22, 5544.0
           ]
         );
-        
+
         // Seed fabric consumption
         await runExec(
           `INSERT INTO budget_fabric_consumption (
@@ -1407,7 +1407,7 @@ async function seedData() {
           0.55, 6.93, 12600, 97318.0
         ]
       );
-      
+
       const tSeeded = await runQuery("SELECT id FROM budget_trims_costs WHERE budget_id = ?", [budgetId]);
       if (tSeeded && tSeeded.length > 0) {
         const tId = tSeeded[0].id;
@@ -1436,7 +1436,7 @@ async function seedData() {
           12.0, 0.44, 5.28, 144000, 63360.0, 'Aman', ''
         ]
       );
-      
+
       const eSeeded = await runQuery("SELECT id FROM budget_emb_costs WHERE budget_id = ?", [budgetId]);
       if (eSeeded && eSeeded.length > 0) {
         const eId = eSeeded[0].id;
@@ -1463,7 +1463,7 @@ async function seedData() {
           122.0, 0.22, 26.84, 1464000, 222090.0, 'Aman', ''
         ]
       );
-      
+
       const wSeeded = await runQuery("SELECT id FROM budget_wash_costs WHERE budget_id = ?", [budgetId]);
       if (wSeeded && wSeeded.length > 0) {
         const wId = wSeeded[0].id;
@@ -1514,7 +1514,7 @@ async function seedData() {
     const newBudgetIdQuery = await runQuery("SELECT id FROM budgets WHERE budget_reference = 'DFL-BS-26-003264'");
     if (newBudgetIdQuery && newBudgetIdQuery.length > 0) {
       const budgetId = newBudgetIdQuery[0].id;
-      
+
       // Seed fabric cost
       await runExec(
         `INSERT INTO budget_fabric_costs (
@@ -1530,11 +1530,11 @@ async function seedData() {
           0.22, 0.44, 25200, 5544.0
         ]
       );
-      
+
       const newFabricIdQuery = await runQuery("SELECT id FROM budget_fabric_costs WHERE budget_id = ?", [budgetId]);
       if (newFabricIdQuery && newFabricIdQuery.length > 0) {
         const fId = newFabricIdQuery[0].id;
-        
+
         // Seed yarns
         await runExec(
           `INSERT INTO budget_yarn_costing (
@@ -1546,7 +1546,7 @@ async function seedData() {
             'Solid', 25200, 0, 'Montrims LTD.', 0.22, 5544.0
           ]
         );
-        
+
         // Seed fabric consumption
         await runExec(
           `INSERT INTO budget_fabric_consumption (
@@ -1573,7 +1573,7 @@ async function seedData() {
           0.55, 6.93, 158760, 87318.0
         ]
       );
-      
+
       const newTrimsIdQuery = await runQuery("SELECT id FROM budget_trims_costs WHERE budget_id = ?", [budgetId]);
       if (newTrimsIdQuery && newTrimsIdQuery.length > 0) {
         const tId = newTrimsIdQuery[0].id;
@@ -1601,7 +1601,7 @@ async function seedData() {
     const bQuery = await runQuery("SELECT id FROM budgets WHERE budget_reference = 'DFL-BS-26-003264'");
     if (bQuery && bQuery.length > 0) {
       const budgetId = bQuery[0].id;
-      
+
       await runExec(
         `INSERT INTO fabric_bookings (
           booking_reference, budget_id, basis, main_booking_id, booking_date,
@@ -1621,7 +1621,7 @@ async function seedData() {
       const bookingIdQuery = await runQuery("SELECT id FROM fabric_bookings WHERE booking_reference = 'DFL-FB-26-000450'");
       if (bookingIdQuery && bookingIdQuery.length > 0) {
         const bookingId = bookingIdQuery[0].id;
-        
+
         await runExec(
           `INSERT INTO fabric_booking_items (
             booking_id, po_id, po_no, color, size, item_size, garments_qty, excess_pct,

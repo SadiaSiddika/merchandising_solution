@@ -56,8 +56,8 @@ export function TemplateSelector({
     <div style={{ display: 'flex', gap: '15px', alignItems: 'center', background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '6px', marginBottom: '15px', border: '1px solid rgba(255,255,255,0.08)', flexWrap: 'wrap' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#94a3b8' }}>Load Template:</span>
-        <select 
-          className="form-control" 
+        <select
+          className="form-control"
           style={{ width: '180px', height: '32px', padding: '0 8px', fontSize: '0.8rem', backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.08)', color: '#f8fafc', borderRadius: '6px' }}
           onChange={(e) => {
             if (!e.target.value) return;
@@ -79,9 +79,9 @@ export function TemplateSelector({
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#94a3b8' }}>Save Current List as Template:</span>
-        <input 
-          type="text" 
-          className="form-control" 
+        <input
+          type="text"
+          className="form-control"
           style={{ width: '160px', height: '32px', fontSize: '0.8rem', backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.08)', color: '#f8fafc', borderRadius: '6px', padding: '0 10px' }}
           placeholder="Template Name"
           value={templateName}
@@ -144,7 +144,7 @@ export function YarnCostingSection({
   return (
     <div style={{ background: 'rgba(255,255,255,0.01)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)', marginTop: '20px' }}>
       <h5 style={{ marginBottom: '12px', fontWeight: 600, color: '#f8fafc' }}>Fabric - Yarn Costing (Production source details)</h5>
-      
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
         <div className="form-group">
           <label className="form-label" style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Yarn Composition *</label>
@@ -271,8 +271,8 @@ export function ConsumptionBrowseModal({
       setPoNo(match.po_no);
       const breakdown = match.breakdown || [];
       if (breakdown.length > 0) {
-        const sizeMatch = breakdown.find((b: any) => 
-          (!color || String(b.color).toLowerCase() === color.toLowerCase()) && 
+        const sizeMatch = breakdown.find((b: any) =>
+          (!color || String(b.color).toLowerCase() === color.toLowerCase()) &&
           (!size || String(b.size).toLowerCase() === size.toLowerCase())
         );
         if (sizeMatch) {
@@ -388,10 +388,10 @@ export function ConsumptionBrowseModal({
       <div className="modal-content" style={{ maxWidth: '900px', width: '95%', background: '#0f172a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px', overflowY: 'auto', maxHeight: '90vh' }}>
         <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
           <h4 style={{ fontWeight: 'bold', color: '#f8fafc' }}>
-            {type === 'fabric' ? 'Grey Consumption spec details' : 
-             type === 'trims' ? 'Trims Cost Consumption spec details' : 
-             type === 'emb' ? 'Embellishment Consumption spec details' : 
-             'Wash Consumption spec details'}
+            {type === 'fabric' ? 'Grey Consumption spec details' :
+              type === 'trims' ? 'Trims Cost Consumption spec details' :
+                type === 'emb' ? 'Embellishment Consumption spec details' :
+                  'Wash Consumption spec details'}
           </h4>
           <XCircle className="modal-close" onClick={onClose} style={{ cursor: 'pointer', color: '#94a3b8' }} />
         </div>

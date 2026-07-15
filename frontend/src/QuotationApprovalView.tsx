@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  XCircle, 
-  Search, 
-  Eye, 
-  HelpCircle, 
-  DollarSign 
+import {
+  XCircle,
+  Search,
+  Eye,
+  HelpCircle,
+  DollarSign
 } from 'lucide-react';
 
 const API_BASE = 'http://localhost:5000/api';
@@ -31,7 +31,7 @@ export function QuotationApprovalView({ buyers = [] }: { buyers?: any[] }) {
 
   const [quotSearch, setQuotSearch] = useState('');
   const [quotStatusFilter, setQuotStatusFilter] = useState('Unapproved');
-  const [actionComments, setActionComments] = useState<{[key: string]: string}>({});
+  const [actionComments, setActionComments] = useState<{ [key: string]: string }>({});
 
   const [filterBasis, setFilterBasis] = useState<'day' | 'month' | 'year' | 'all'>('all');
   const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
@@ -326,7 +326,7 @@ export function QuotationApprovalView({ buyers = [] }: { buyers?: any[] }) {
       }
 
       // 2. Search & Status Filter
-      const matchesSearch = 
+      const matchesSearch =
         inq.id.toString().includes(inqSearch) ||
         (inq.style_no || '').toLowerCase().includes(inqSearch.toLowerCase()) ||
         (inq.buyer_name || inq.buyer || '').toLowerCase().includes(inqSearch.toLowerCase()) ||
@@ -483,7 +483,7 @@ export function QuotationApprovalView({ buyers = [] }: { buyers?: any[] }) {
       }
 
       // 2. Search & Status Filter
-      const matchesSearch = 
+      const matchesSearch =
         q.id.toString().includes(quotSearch) ||
         (q.style_no || '').toLowerCase().includes(quotSearch.toLowerCase()) ||
         (q.buyer_name || q.buyer || '').toLowerCase().includes(quotSearch.toLowerCase()) ||
@@ -504,7 +504,7 @@ export function QuotationApprovalView({ buyers = [] }: { buyers?: any[] }) {
 
   return (
     <div className="quotation-approval-view" style={{ animation: 'fadeIn 0.25s ease-out' }}>
-      
+
       {/* Sub-Tabs Switcher */}
       <div className="tab-container" style={{ marginBottom: '20px' }}>
         <div className={`tab ${activeSubTab === 'inquiry' ? 'active' : ''}`} onClick={() => setActiveSubTab('inquiry')}>
@@ -557,17 +557,17 @@ export function QuotationApprovalView({ buyers = [] }: { buyers?: any[] }) {
           <div style={{ padding: '0 20px', marginBottom: '20px', display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'center' }}>
             <div style={{ position: 'relative', flex: 1, minWidth: '260px' }}>
               <Search size={16} style={{ position: 'absolute', left: '12px', top: '10px', color: 'var(--text-muted)' }} />
-              <input 
-                type="text" 
-                className="form-control" 
-                placeholder="Search Inquiry ID, Style No, Buyer, or Team Leader..." 
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Search Inquiry ID, Style No, Buyer, or Team Leader..."
                 value={inqSearch}
                 onChange={e => setInqSearch(e.target.value)}
                 style={{ paddingLeft: '36px', height: '36px' }}
               />
             </div>
-            <select 
-              className="form-control" 
+            <select
+              className="form-control"
               value={inqStatusFilter}
               onChange={e => setInqStatusFilter(e.target.value)}
               style={{ width: '220px', height: '36px' }}
@@ -758,17 +758,17 @@ export function QuotationApprovalView({ buyers = [] }: { buyers?: any[] }) {
           <div style={{ padding: '0 20px', marginBottom: '20px', display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'center' }}>
             <div style={{ position: 'relative', flex: 1, minWidth: '260px' }}>
               <Search size={16} style={{ position: 'absolute', left: '12px', top: '10px', color: 'var(--text-muted)' }} />
-              <input 
-                type="text" 
-                className="form-control" 
-                placeholder="Search Quotation ID, Style No, Buyer, or Team Leader..." 
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Search Quotation ID, Style No, Buyer, or Team Leader..."
                 value={quotSearch}
                 onChange={e => setQuotSearch(e.target.value)}
                 style={{ paddingLeft: '36px', height: '36px' }}
               />
             </div>
-            <select 
-              className="form-control" 
+            <select
+              className="form-control"
               value={quotStatusFilter}
               onChange={e => setQuotStatusFilter(e.target.value)}
               style={{ width: '220px', height: '36px' }}
@@ -913,11 +913,11 @@ export function QuotationApprovalView({ buyers = [] }: { buyers?: any[] }) {
 
                           {/* Comment box for reviewer */}
                           {quotSimRole === 'Store Manager' && q.status !== 'Approved' && (
-                            <input 
-                              type="text" 
-                              className="form-control" 
+                            <input
+                              type="text"
+                              className="form-control"
                               style={{ height: '30px', fontSize: '12px' }}
-                              placeholder="Add reason for approval, revision or rejection..." 
+                              placeholder="Add reason for approval, revision or rejection..."
                               value={actionComments[q.id] || ''}
                               onChange={e => {
                                 const val = e.target.value;
@@ -1034,7 +1034,7 @@ export function QuotationApprovalView({ buyers = [] }: { buyers?: any[] }) {
                 </table>
               </div>
             </div>
-            
+
             <div className="modal-footer" style={{ borderTop: '1px solid var(--border-muted)', paddingTop: '15px', paddingBottom: '15px' }}>
               <button className="btn btn-secondary" onClick={() => setSelectedInquiry(null)}>Close</button>
             </div>
