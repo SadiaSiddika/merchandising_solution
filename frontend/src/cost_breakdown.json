@@ -1,0 +1,149 @@
+[
+    {
+        "Budget": "SL",
+        "Unnamed: 2": "Menu",
+        "Unnamed: 3": "Event",
+        "Unnamed: 4": "Story",
+        "Unnamed: 5": "Dependancy"
+    },
+    {
+        "Budget": NaN,
+        "Unnamed: 2": "Budget",
+        "Unnamed: 3": "Create New (Button)",
+        "Unnamed: 4": "Super Admin (Can get all List)",
+        "Unnamed: 5": NaN
+    },
+    {
+        "Budget": NaN,
+        "Unnamed: 2": NaN,
+        "Unnamed: 3": NaN,
+        "Unnamed: 4": "Admin User (Will get Companies all Unit)",
+        "Unnamed: 5": NaN
+    },
+    {
+        "Budget": NaN,
+        "Unnamed: 2": NaN,
+        "Unnamed: 3": NaN,
+        "Unnamed: 4": "Specific  Unit Wise Permission user will get only permitted Company",
+        "Unnamed: 5": NaN
+    },
+    {
+        "Budget": NaN,
+        "Unnamed: 2": NaN,
+        "Unnamed: 3": NaN,
+        "Unnamed: 4": "The search Field will be against \"Order ID & Price Quotation ID & Style\" ",
+        "Unnamed: 5": "# If select Price Quotation ID or Style Data come from Price Quotation\n\n# If you select style - that particular style comes in dropdown which styles Price Quotation has done."
+    },
+    {
+        "Budget": NaN,
+        "Unnamed: 2": NaN,
+        "Unnamed: 3": NaN,
+        "Unnamed: 4": "Buyer, style, Quotation ID, Style description, Product Department, Sewing SMV, Sewing Efficiency, Cutting SMV, Cutting Efficiency, Finish SMV, Finishing Efficiency - will fill up auto",
+        "Unnamed: 5": NaN
+    },
+    {
+        "Budget": NaN,
+        "Unnamed: 2": NaN,
+        "Unnamed: 3": "1st Tab (Required Info)",
+        "Unnamed: 4": "Data Source* (Order Reference, Price Quotation Reference & Style)\nOrder ID/ Price Quotation Reference* - Dropdown\nStyle* (If select style - The dropdown shows that Style which Price Quotation has Done otherwise it will come auto by Order Reference/ Price Quotation Reference.\n#Get Data Button\n\nTeam Leader (Fill up From Price Quotation Reference or Order Reference) - Read Only mode\nDealing Merchant (Fill up From Order Reference or Buyer Entry) - Read Only mode\nShipment Date (Fill up From Price Quotation Reference or Order Reference) - Read Only  mode\n\nBuyer*(From Price Quotation Reference or Order Reference),  \nStyle Description (From Price Quotation Reference or Order Reference), \nBudget Label (Hardcoded Dropdown - Style Label, PO Label),\nPO (Dropdown Multiple PO select - PO Dropdown will come against Style) - If Select PO Label.\nQuantity (If you select Style total quantity will come and if you choose PO - Particular PO quantity will come).\nUOM (From Order Reference)\nGarments Item Group (From Price Quotation Reference or Order Reference),\nSeason (From Price Quotation Reference or Order Reference),\nGarments Category (From Price Quotation Reference or Order Reference),\nCosting Per(Hardcoded Dropdown - 1Pc, 1Dzn, 2Dzn, 3Dzn, 4Dzn) or Auto From Price Quotation  Reference.\nIncoterm (From Price Quotation  Reference or Dropdown from Master & Auto show FOB),\nMC/Line (From Price Quotation Reference or Text),\nProduction/Line/Hour (From Price Quotation Reference or Text),\nBudget Minute (Text),\nCutting SMV (From Price Quotation Reference or Text),\nSewing SMV (From Price Quotation Reference or Text),\nFinishing SMV (From Price Quotation Reference or Text),\nSewing Eficienecy% (From Price Quotation Reference or Text),\nCutting Efficiency% (From Price Quotation Reference or Text),\nFinishing Efficiency% (From Price Quotation Reference or Text),\n\nImage - Auto from Price Quotation ID or Order ID\nFile Upload Multiple - PDF & Excel",
+        "Unnamed: 5": "1. Data comes from Order ID/Price Quotation ID\n2. If the data (particular field) doesn't match with Order ID/Price Quotation ID then that particular field should be opened & selected from a dropdown or writeable field.\n\n3. There should be an option for Save & Draft Save. If click Draft it saves those data & takes me list page - No validation with Mandatory Field."
+    },
+    {
+        "Budget": NaN,
+        "Unnamed: 2": NaN,
+        "Unnamed: 3": "2nd Tab (Others Info)",
+        "Unnamed: 4": "Country (From Price Quotation Reference or Order Reference),\nBuying  Agent  (From Price Quotation Reference or Order Reference),\nCurrency (From Price Quotation Reference or Order Reference),\nIncoterm Place (From Price Quotation Reference or Order Reference),\nShip Mode (Hardcoded Dropdown - Sea, Air, Road, Train, Sea/Air, Road/Air)\nCosting Date (Calender),\nCopy From (Text), \nFile No (Text), \nInternal Ref (Text), \nRemarks (Writeable), \n",
+        "Unnamed: 5": "1. If the data (particular field) doesn't match with Order Reference/Price Quotation Reference then that particular field should be opened & selected from a dropdown from Master or Text field.\n\n# There should be an option for Save & Draft Save. If click Draft it saves those data & takes me list page - No validation with Mandatory Field."
+    },
+    {
+        "Budget": NaN,
+        "Unnamed: 2": NaN,
+        "Unnamed: 3": "List of all Costs- ",
+        "Unnamed: 4": "List - \n\nFabric Cost (Browse Option)\nTrims Cost (Browse Option)\nEmb. Cost (Browse Option)   \nGmts. Wash (Browse Option)\nComml. Cost (Browse Option)\nLab Test (Float)\nInspection Cost (Float)\nCM Cost (Float)\nSample Cost (Float)\nFreight Cost (Float)\nOther Cost (Browse Option)\nCourier Cost (Float)\nCertif. Cost (Float)\nCommon OH (Float)\nDeffd. LC Cost (Float)\nDesign Cost (Float)\nStudio Cost (Float)\nOpert. Exp. (Float)\nIncome Tax (Float)\nTotal Cost - Sum of All cost of above.",
+        "Unnamed: 5": NaN
+    },
+    {
+        "Budget": NaN,
+        "Unnamed: 2": NaN,
+        "Unnamed: 3": "Fabric Cost",
+        "Unnamed: 4": "Fabric Cost- \nHave a Template saving option.\nGmt. Item ( From Price Quotation Reference or Dropdpwn form Master)\nBody Part * ( From Price Quotation Reference or Dropdpwn form Master)\nBody Part Type ( From Price Quotation Reference or Text)\nColor Range * (From Price Quotation Reference or Dropdpwn form Master)\nColor Nature (From Price Quotation Reference or Dropdpwn form Master)\nFabric Composition * (From Price Quotation Reference or Dropdpwn form Master)\nFabric Type * (From Price Quotation Reference or Auto fill up according to Fabric Composition)\nFabric Nature (From Price Quotation Reference or Auto fill up according to Fabric Composition)\nCode (From Price Quotation Reference or Integer)\nFabric Source * (From Price Quotation Reference or Hardcoded Dropdown - Production, Purchase, Buyer Supplier and Stock)\nN. Supplier (From Price Quotation Reference or Dropdpwn form Master)\nGsm/Oz * (From Price Quotation Reference or Integer)\nDia Type (From Price Quotation Reference or Dropdpwn form Master)\nColor & Size Sensitive (Hardcoded Dropdpwn - As per Garments Color, Contrast Color)\nColor (Browse Option if  Color & Size Sensitive is Contrast Color otherwise this field is disable)\nConsumption Basis (From Price Quotation Reference or Hardcoded Dropdown - CAD, Measurement, Marker)\nUOM * (From Price Quotation Reference or Dropdpwn form Master)\nGrey Consumption * (Browse Option)\nRate (Auto fill uo from consumption)\nAmount (Auto fill uo from consumption)\nTotal Quantity (Auto fill uo from consumption)\nTotal Amount (Auto fill uo from consumption)\nImage Attachment option\nAdd a Line\n\n\nGrey Consumption * (Browse Option)\nPO No (From Order Reference)\nColor (From Order Reference)\nGmt. Sizes (From Order Reference)\nPO Quantity (From Order Reference)\nDia/Cuttable Width (Integer)\nDia Fin Type (Text)\nFinish Cons (Float)\nProcess Loss % (Integer)\nGrey Cons (Finish Cons + Process Loss %)\nRate (Float)\nAmount (Auto Calculate - Grey Cons x Rate)\nPcs (Integer)\nTotal Finish Qty (Auto Calculate - PO Quantity x Finish Cons)\nTotal Qty (Auto Calculate - PO Quantity x Grey Cons)\nSample Qty (Integer)\nTotal Amount (Auto Calculate - PO Quantity x Amount)\nRemarks (Text)\nAdd a Line\n\n\nIf the Color & Size Sensitive is \"Contrast Color\" then we need to input the below data - Color\nGmts Color - (From Order Reference)\nFabric Color - (Dropdown from Master)\n\n\nIf the Source is \"Production\" then we need to input the below data - Fabric - Yarn Costing\nFabric Composition (Auto fill up from previous entry)\nYarn. Composition * ( From Price Quotation Reference or Dropdpwn form Master)\nYarn Count *( From Price Quotation Reference or Dropdpwn form Master)\nYarn Type ( From Price Quotation Reference or Dropdpwn form Master)\nPercentage(%) * ( From Price Quotation Reference or Integer)\nColor ( From Price Quotation Reference or Text)\nCons Quantity (Auto fill up from Fabric Cost)\nProcess Loss (Integer)\nN. Supplier (Dropdown from Master)\nRate * (Float)\nAmount - (Cons Quantity x Rate)\nAdd a Line\n\nSave",
+        "Unnamed: 5": "Data come by Price Quotation Reference & Open\n\n# Budget is fixed for all except Fabric, Trims, Embellishment, Garments wash, Lab Test, Inspection, and sample Test.\n\n# There should be an option for Save & Draft Save. If click Draft it saves those data & takes me list page - No validation with Mandatory Field."
+    },
+    {
+        "Budget": NaN,
+        "Unnamed: 2": NaN,
+        "Unnamed: 3": "Trims Cost",
+        "Unnamed: 4": "Trims Cost- \nHave a Template saving option\nGmts. Item (From Price Quotation Reference or Dropdpwn form Master)\nItem Name * (From Price Quotation Reference or Dropdpwn form Master)\nItem Description (From Price Quotation Reference or Text)\nCons Uom (From Price Quotation Reference or Auto fill up according to Item Name)\nCons/Unit Gmts * (Browse Option)\nRate * (Auto fill up from Consumption)\nAmount (Auto fill up from Consumption)\nTotal Qty (Auto fill up from Consumption)\nTotal Amount * (Auto fill up from Consumption)\nImage Attachment option\nAdd a Line\n\n\nCons/Unit Gmts * (Browse Option)\nPO No (From Order Reference)\nColor (From Order Reference)\nGmt. Sizes (From Order Reference)\nPO Quantity (From Order Reference)\nCountry (From Order Reference)\nFinish Cons (Float)\nProcess Loss % (Integer)\nGrey Cons (Finish Cons + Process Loss %)\nRate (Float)\nAmount (Auto Calculate - Grey Cons x Rate)\nPcs (Integer)\nTotal Finish Qty (Auto Calculate - PO Quantity x Finish Cons)\nTotal Qty (Auto Calculate - PO Quantity x Grey Cons)\nTotal Amount (Auto Calculate - PO Quantity x Amount)\nAdd a Line",
+        "Unnamed: 5": "# Data come by Price Quotation Reference (Template) & Open\n"
+    },
+    {
+        "Budget": NaN,
+        "Unnamed: 2": NaN,
+        "Unnamed: 3": "Embellishment Cost",
+        "Unnamed: 4": "Embellishment Cost- \nHave a Template saving option\nEmbellishment Type * (From Price Quotation Reference or Dropdpwn form Master)\nEmbellishment Name * (From Price Quotation Reference or Dropdpwn form Master)\nGmts. Item (From Price Quotation Reference or Dropdpwn form Master)\nDescription (From Price Quotation Reference or Text)\nBody Part (From Price Quotation Reference or Dropdpwn form Master)\nCons/Unit Gmts * (Browse Option)\nRate * (Auto fill up from Consumption)\nAmount (Auto fill up from Consumption)   \nSupplier (From Price Quotation Reference or Dropdpwn form Master)\nAdd a Line\n\nCons/Unit Gmts * (Browse Option)\nPO No (From Order Reference)\nColor (From Order Reference)\nGmt. Sizes (From Order Reference)\nPO Quantity (From Order Reference)\nCountry (From Order Reference)\nCons (Float)\nProcess Loss % (Integer)\nRate (Float)\nAmount (Auto Calculate - Cons x Rate + Process Loss %)\nTotal Qty (Auto Calculate - PO Quantity x Cons)\nTotal Amount (Auto Calculate - PO Quantity x Amount)\nPcs (Integer)",
+        "Unnamed: 5": NaN
+    },
+    {
+        "Budget": NaN,
+        "Unnamed: 2": NaN,
+        "Unnamed: 3": "Wash Cost",
+        "Unnamed: 4": "Wash Cost- \nHave a Template saving option\nWash Type * (From Price Quotation Reference or Dropdpwn form Master)\nWash Name * (From Price Quotation Reference or Dropdpwn form Master)\nGmts. Item (From Price Quotation Reference or Dropdpwn form Master)\nDescription (From Price Quotation Reference or Text)\nBody Part (From Price Quotation Reference or Dropdpwn form Master)\nCons/Unit Gmts * (Browse Option)\nRate * (Auto fill up from Consumption)\nAmount (Auto fill up from Consumption)   \nSupplier (From Price Quotation Reference or Dropdpwn form Master)\nAdd a Line\n\nCons/Unit Gmts * (Browse Option)\nPO No (From Order Reference)\nColor (From Order Reference)\nGmt. Sizes (From Order Reference)\nPO Quantity (From Order Reference)\nCountry (From Order Reference)\nCons (Float)\nProcess Loss % (Integer)\nRate (Float)\nAmount (Auto Calculate - Cons x Rate + Process Loss %)\nTotal Qty (Auto Calculate - PO Quantity x Cons)\nTotal Amount (Auto Calculate - PO Quantity x Amount)\nPcs (Integer)",
+        "Unnamed: 5": NaN
+    },
+    {
+        "Budget": NaN,
+        "Unnamed: 2": NaN,
+        "Unnamed: 3": "Commercial Cost\n",
+        "Unnamed: 4": "Commercial Cost- \nHave a Template saving option\nType * (From Price Quotation Reference or Dropdpwn form Master)\nRate in (%) * (From Price Quotation Reference or Integer)\nAmount * (From Price Quotation Reference or Auto fill up according to the backend formula)\nStatus (From Price Quotation Reference or Hardcoded Dropdown - Active, Inactive)\nAdd a Line",
+        "Unnamed: 5": NaN
+    },
+    {
+        "Budget": NaN,
+        "Unnamed: 2": NaN,
+        "Unnamed: 3": "Commission Cost\n",
+        "Unnamed: 4": "Commission Cost - \nParticulars *  (From Price Quotation Reference or Hardcoded Dropdown - Foreign, Local)\nCommn. Base * (From Price Quotation Reference or Hardcoded Dropdown -In Percentage, Per Dzn, Per Pcs)\nCommn Rate * (From Price Quotation Reference or Float) \nAmount (From Price Quotation Reference or Auto fill up according to the backend formula)\nStatus  (From Price Quotation Reference or Hardcoded Dropdown - Active, Inactive)\nAdd a Line",
+        "Unnamed: 5": NaN
+    },
+    {
+        "Budget": NaN,
+        "Unnamed: 2": NaN,
+        "Unnamed: 3": "List",
+        "Unnamed: 4": "Budget Reference,\nBuyer, \nStyle, \nPO, \nPO Quantity, \nPO Value, \nBudget Value,\nGarments Item,\nTeam Leader, \nDealing Merchant, \nTotal SMV, \nBudgeted SMV, \nBudget Created Date, \nShipment Date, \nBudget Approval Status (Approved/Not Approved), \nAction (1st, 2nd, 3rd view page, Edit, Delete & rest as Quotation)",
+        "Unnamed: 5": "PO Value = PO Quantity x FOB\n\nBudget Value = Total Cost\n\nTotal SMV = SMV x Total PO Quantity\n\nBudgeted SMV = SMV x Budget Quantity\n\nBudget Date = Created date\n\nShipment Date = PO Shipment Date"
+    },
+    {
+        "Budget": NaN,
+        "Unnamed: 2": NaN,
+        "Unnamed: 3": "View Pages",
+        "Unnamed: 4": NaN,
+        "Unnamed: 5": NaN
+    },
+    {
+        "Budget": "Budget Approval",
+        "Unnamed: 2": NaN,
+        "Unnamed: 3": NaN,
+        "Unnamed: 4": NaN,
+        "Unnamed: 5": NaN
+    },
+    {
+        "Budget": "SL",
+        "Unnamed: 2": "Menu",
+        "Unnamed: 3": "Event",
+        "Unnamed: 4": "Story",
+        "Unnamed: 5": "Dependancy"
+    },
+    {
+        "Budget": NaN,
+        "Unnamed: 2": "Approval",
+        "Unnamed: 3": NaN,
+        "Unnamed: 4": "Search Field - Buyer (Multiple), Reference No. (Multiple), Year (Multiple), Style (Multiple), From Date. To Date, Approval Type, Action( Search)",
+        "Unnamed: 5": NaN
+    },
+    {
+        "Budget": NaN,
+        "Unnamed: 2": NaN,
+        "Unnamed: 3": NaN,
+        "Unnamed: 4": "After Search - List - SL, Buyer, Style, PO, Actual PO Quantity, Plan cut Quantity, FOB, Extra%, Garments Group, Fabric Type, Composition, GSM, Garments Certification, PO, Received Date, Shipment Date, Lead Time, Merchant, Team Leader, PO Approved Status ( Approved/Not Approved), Approve by, User Remarks, Feedback from approval body,  Image, Action ( 1st, 2nd, 3rd view page, Edit, Delete & others as Quotation).",
+        "Unnamed: 5": NaN
+    }
+]
