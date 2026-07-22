@@ -136,7 +136,8 @@ textarea {
 }
 
 .sidebar.resizing {
-  transition: none !important; /* disable transitions during active resize drag */
+  transition: none !important;
+  /* disable transitions during active resize drag */
 }
 
 .sidebar.collapsed {
@@ -1131,4 +1132,82 @@ body.light-theme .data-table tbody tr:hover {
 .theme-toggle-switch.light .theme-toggle-handle {
   transform: translateX(20px);
   color: var(--primary);
+}
+
+/* CRM Sales Target White Report Styles */
+.white-report-view {
+  background-color: #ffffff !important;
+  color: #1e293b !important;
+  padding: 25px !important;
+  border-radius: 8px !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+.white-report-view h2,
+.white-report-view h3,
+.white-report-view h4,
+.white-report-view .card-title {
+  color: #0f172a !important;
+  font-weight: 700 !important;
+}
+
+.white-report-view .card-header {
+  border-bottom: 1px solid #cbd5e1 !important;
+  padding-bottom: 15px !important;
+  margin-bottom: 20px !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  background: transparent !important;
+}
+
+.white-report-view .btn-secondary {
+  background-color: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #334155 !important;
+  font-weight: 600 !important;
+  transition: all 0.2s ease !important;
+}
+
+.white-report-view .btn-secondary:hover {
+  background-color: #e2e8f0 !important;
+}
+
+.white-report-view .data-table {
+  background-color: #ffffff !important;
+  color: #334155 !important;
+  border: 1px solid #cbd5e1 !important;
+  border-collapse: collapse !important;
+}
+
+.white-report-view .data-table th {
+  background-color: #f8fafc !important;
+  color: #334155 !important;
+  font-weight: 700 !important;
+  border: 1px solid #cbd5e1 !important;
+  padding: 8px !important;
+}
+
+.white-report-view .data-table td {
+  border: 1px solid #cbd5e1 !important;
+  color: #334155 !important;
+  padding: 8px !important;
+  background-color: #ffffff !important;
+}
+
+.white-report-view .data-table tbody tr:hover td {
+  background-color: #f1f5f9 !important;
+}
+
+.white-report-view .data-table tfoot tr {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  font-weight: 700 !important;
+}
+
+.white-report-view .data-table tfoot td {
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+  background-color: #f8fafc !important;
 }

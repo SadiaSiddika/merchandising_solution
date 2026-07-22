@@ -129,28 +129,41 @@ async function createTables() {
       created_at ${textType} DEFAULT CURRENT_TIMESTAMP
     )`,
 
-    // 2. Sales Targets
+    // 2. Sales Targets (header record)
     `CREATE TABLE IF NOT EXISTS sales_targets (
       id ${autoIncrement},
+      unit ${textType},
       buyer_id INTEGER,
       team_leader ${textType},
       season ${textType},
       year INTEGER,
-      month ${textType},
-      target_qty ${numType},
-      target_value ${numType},
-      confirm_qty ${numType} DEFAULT 0,
-      confirm_value ${numType} DEFAULT 0,
       status ${textType} DEFAULT 'Draft',
       brand ${textType},
       buying_agent ${textType},
       buying_agent_merchant ${textType},
+      created_at ${textType} DEFAULT CURRENT_TIMESTAMP
+    )`,
+
+    // 2b. Sales Target Months (child rows - one per month)
+    `CREATE TABLE IF NOT EXISTS sales_target_months (
+      id ${autoIncrement},
+      sales_target_id INTEGER NOT NULL,
+      month ${textType} NOT NULL,
       target_basic_qty ${numType} DEFAULT 0,
       target_basic_val ${numType} DEFAULT 0,
       target_casual_qty ${numType} DEFAULT 0,
       target_casual_val ${numType} DEFAULT 0,
       target_fashion_qty ${numType} DEFAULT 0,
       target_fashion_val ${numType} DEFAULT 0,
+      achieve_basic_qty ${numType} DEFAULT 0,
+      achieve_basic_val ${numType} DEFAULT 0,
+      achieve_casual_qty ${numType} DEFAULT 0,
+      achieve_casual_val ${numType} DEFAULT 0,
+      achieve_fashion_qty ${numType} DEFAULT 0,
+      achieve_fashion_val ${numType} DEFAULT 0,
+      confirm_qty ${numType} DEFAULT 0,
+      confirm_value ${numType} DEFAULT 0,
+      is_locked INTEGER DEFAULT 0,
       created_at ${textType} DEFAULT CURRENT_TIMESTAMP
     )`,
 
@@ -986,16 +999,47 @@ async function runMigrations() {
   const numType = dbType === 'postgres' ? 'DOUBLE PRECISION' : 'REAL';
   const intType = 'INTEGER';
 
-  // Migrate sales_targets
+  // Migrate sales_targets (header fields)
+  await addCol('sales_targets', 'unit', textType);
   await addCol('sales_targets', 'brand', textType);
   await addCol('sales_targets', 'buying_agent', textType);
   await addCol('sales_targets', 'buying_agent_merchant', textType);
+  // Legacy columns kept for backward compat (old single-row records)
   await addCol('sales_targets', 'target_basic_qty', numType);
   await addCol('sales_targets', 'target_basic_val', numType);
   await addCol('sales_targets', 'target_casual_qty', numType);
   await addCol('sales_targets', 'target_casual_val', numType);
   await addCol('sales_targets', 'target_fashion_qty', numType);
   await addCol('sales_targets', 'target_fashion_val', numType);
+
+  // Create sales_target_months if not exists
+  const numTypeMig = dbType === 'postgres' ? 'DOUBLE PRECISION' : 'REAL';
+  const autoIncrMig = dbType === 'postgres' ? 'SERIAL PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT';
+  try {
+    await runExec(`CREATE TABLE IF NOT EXISTS sales_target_months (
+      id ${autoIncrMig},
+      sales_target_id INTEGER NOT NULL,
+      month TEXT NOT NULL,
+      target_basic_qty ${numTypeMig} DEFAULT 0,
+      target_basic_val ${numTypeMig} DEFAULT 0,
+      target_casual_qty ${numTypeMig} DEFAULT 0,
+      target_casual_val ${numTypeMig} DEFAULT 0,
+      target_fashion_qty ${numTypeMig} DEFAULT 0,
+      target_fashion_val ${numTypeMig} DEFAULT 0,
+      achieve_basic_qty ${numTypeMig} DEFAULT 0,
+      achieve_basic_val ${numTypeMig} DEFAULT 0,
+      achieve_casual_qty ${numTypeMig} DEFAULT 0,
+      achieve_casual_val ${numTypeMig} DEFAULT 0,
+      achieve_fashion_qty ${numTypeMig} DEFAULT 0,
+      achieve_fashion_val ${numTypeMig} DEFAULT 0,
+      confirm_qty ${numTypeMig} DEFAULT 0,
+      confirm_value ${numTypeMig} DEFAULT 0,
+      is_locked INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )`);
+  } catch (e) {
+    console.error('Migration error creating sales_target_months:', e.message);
+  }
 
   // Migrate quotation_inquiries
   await addCol('quotation_inquiries', 'garments_item', textType);

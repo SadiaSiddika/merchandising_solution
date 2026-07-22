@@ -273,14 +273,46 @@ app.post('/api/items', async (req, res) => {
   }
 });
 
-// 3. Sales Target Endpoints
+// 3. Sales Target Endpoints (Header + Months Architecture)
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+// GET all headers with aggregated month totals
 app.get('/api/sales-targets', async (req, res) => {
   try {
     const rows = await db.runQuery(`
-      SELECT st.*, b.name as buyer_name, b.code as buyer_code 
+      SELECT st.*, COALESCE(b.name, st.buyer_name) as buyer_name, b.code as buyer_code,
+        COALESCE(agg.total_basic_qty,0) as total_basic_qty,
+        COALESCE(agg.total_basic_val,0) as total_basic_val,
+        COALESCE(agg.total_casual_qty,0) as total_casual_qty,
+        COALESCE(agg.total_casual_val,0) as total_casual_val,
+        COALESCE(agg.total_fashion_qty,0) as total_fashion_qty,
+        COALESCE(agg.total_fashion_val,0) as total_fashion_val,
+        COALESCE(agg.target_qty,0) as target_qty,
+        COALESCE(agg.target_value,0) as target_value,
+        COALESCE(agg.achieve_qty,0) as achieve_qty,
+        COALESCE(agg.achieve_value,0) as achieve_value,
+        COALESCE(agg.confirm_qty,0) as confirm_qty,
+        COALESCE(agg.confirm_value,0) as confirm_value
       FROM sales_targets st
       LEFT JOIN buyers b ON st.buyer_id = b.id
-      ORDER BY st.year DESC, st.month DESC
+      LEFT JOIN (
+        SELECT sales_target_id,
+          SUM(target_basic_qty) as total_basic_qty,
+          SUM(target_basic_val) as total_basic_val,
+          SUM(target_casual_qty) as total_casual_qty,
+          SUM(target_casual_val) as total_casual_val,
+          SUM(target_fashion_qty) as total_fashion_qty,
+          SUM(target_fashion_val) as total_fashion_val,
+          SUM(target_basic_qty + target_casual_qty + target_fashion_qty) as target_qty,
+          SUM(target_basic_val + target_casual_val + target_fashion_val) as target_value,
+          SUM(achieve_basic_qty + achieve_casual_qty + achieve_fashion_qty) as achieve_qty,
+          SUM(achieve_basic_val + achieve_casual_val + achieve_fashion_val) as achieve_value,
+          SUM(confirm_qty) as confirm_qty,
+          SUM(confirm_value) as confirm_value
+        FROM sales_target_months
+        GROUP BY sales_target_id
+      ) agg ON agg.sales_target_id = st.id
+      ORDER BY st.year DESC, st.id DESC
     `);
     res.json(rows);
   } catch (e) {
@@ -288,41 +320,197 @@ app.get('/api/sales-targets', async (req, res) => {
   }
 });
 
+
+// GET single target with all month rows
+app.get('/api/sales-targets/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const headers = await db.runQuery(`
+      SELECT st.*, COALESCE(b.name, st.buyer_name) as buyer_name, b.code as buyer_code
+      FROM sales_targets st LEFT JOIN buyers b ON st.buyer_id = b.id
+      WHERE st.id = ?`, [id]);
+    if (!headers.length) return res.status(404).json({ error: 'Not found' });
+    const months = await db.runQuery(
+      `SELECT * FROM sales_target_months WHERE sales_target_id = ? ORDER BY id ASC`, [id]);
+    // Ensure all 12 months present
+    const monthMap = {};
+    months.forEach(m => { monthMap[m.month] = m; });
+    const fullMonths = MONTHS.map(mn => monthMap[mn] || {
+      sales_target_id: parseInt(id), month: mn,
+      target_basic_qty: 0, target_basic_val: 0,
+      target_casual_qty: 0, target_casual_val: 0,
+      target_fashion_qty: 0, target_fashion_val: 0,
+      achieve_basic_qty: 0, achieve_basic_val: 0,
+      achieve_casual_qty: 0, achieve_casual_val: 0,
+      achieve_fashion_qty: 0, achieve_fashion_val: 0,
+      confirm_qty: 0, confirm_value: 0, is_locked: 0
+    });
+    res.json({ ...headers[0], months: fullMonths });
+  } catch (e) {
+    handleError(res, e, "GET /api/sales-targets/:id");
+  }
+});
+
+// POST create header + initialize 12 blank month rows
 app.post('/api/sales-targets', async (req, res) => {
   try {
-    const {
-      buyer_id, team_leader, season, year, month, target_qty, target_value, status,
-      brand, buying_agent, buying_agent_merchant,
-      target_basic_qty, target_basic_val, target_casual_qty, target_casual_val, target_fashion_qty, target_fashion_val
-    } = req.body;
+    const { unit, buyer_id, buyer_name, team_leader, season, year, brand, buying_agent, buying_agent_merchant, status, style_id } = req.body;
+    const dbBuyerId = (buyer_id && buyer_id !== "") ? parseInt(buyer_id) : null;
+    const dbYear = (year && year !== "") ? parseInt(year) : new Date().getFullYear();
     const result = await db.runExec(
-      `INSERT INTO sales_targets (buyer_id, team_leader, season, year, month, target_qty, target_value, status,
-        brand, buying_agent, buying_agent_merchant,
-        target_basic_qty, target_basic_val, target_casual_qty, target_casual_val, target_fashion_qty, target_fashion_val)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [buyer_id, team_leader, season, year, month, target_qty, target_value, status || 'Draft',
-        brand, buying_agent, buying_agent_merchant,
-        target_basic_qty, target_basic_val, target_casual_qty, target_casual_val, target_fashion_qty, target_fashion_val]
+      `INSERT INTO sales_targets (unit, buyer_id, buyer_name, team_leader, season, year, brand, buying_agent, buying_agent_merchant, status, style_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [unit, dbBuyerId, buyer_name || '', team_leader, season, dbYear, brand, buying_agent, buying_agent_merchant, status || 'Draft', style_id || '']
     );
-    res.status(201).json({ id: result.insertId, message: "Sales target created successfully" });
+    const newId = result.insertId;
+    // Initialize 12 blank month rows
+    for (const month of MONTHS) {
+      await db.runExec(
+        `INSERT INTO sales_target_months (sales_target_id, month) VALUES (?, ?)`,
+        [newId, month]
+      );
+    }
+    res.status(201).json({ id: newId, message: "Sales target created successfully" });
   } catch (e) {
     handleError(res, e, "POST /api/sales-targets");
   }
 });
 
+// PUT update header
 app.put('/api/sales-targets/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { target_qty, target_value, confirm_qty, confirm_value, status } = req.body;
+    const { unit, buyer_id, buyer_name, team_leader, season, year, brand, buying_agent, buying_agent_merchant, status, style_id } = req.body;
+    const dbBuyerId = (buyer_id && buyer_id !== "") ? parseInt(buyer_id) : null;
+    const dbYear = (year && year !== "") ? parseInt(year) : new Date().getFullYear();
     await db.runExec(
-      "UPDATE sales_targets SET target_qty=?, target_value=?, confirm_qty=?, confirm_value=?, status=? WHERE id=?",
-      [target_qty, target_value, confirm_qty, confirm_value, status, id]
+      `UPDATE sales_targets SET unit=?, buyer_id=?, buyer_name=?, team_leader=?, season=?, year=?, brand=?, buying_agent=?, buying_agent_merchant=?, status=?, style_id=? WHERE id=?`,
+      [unit, dbBuyerId, buyer_name || '', team_leader, season, dbYear, brand, buying_agent, buying_agent_merchant, status, style_id || '', id]
     );
     res.json({ message: "Sales target updated successfully" });
   } catch (e) {
-    handleError(res, e, "PUT /api/sales-targets");
+    handleError(res, e, "PUT /api/sales-targets/:id");
   }
 });
+
+// PUT update a single month row (blocked if locked)
+app.put('/api/sales-targets/:id/months/:month', async (req, res) => {
+  try {
+    const { id, month } = req.params;
+    // Check if locked
+    const rows = await db.runQuery(
+      `SELECT is_locked, id as month_id FROM sales_target_months WHERE sales_target_id=? AND month=?`, [id, month]);
+    if (rows.length && rows[0].is_locked) {
+      return res.status(403).json({ error: 'This month row is locked and cannot be edited.' });
+    }
+    const {
+      target_basic_qty, target_basic_val, target_casual_qty, target_casual_val,
+      target_fashion_qty, target_fashion_val, confirm_qty, confirm_value
+    } = req.body;
+
+    if (rows.length) {
+      await db.runExec(
+        `UPDATE sales_target_months SET target_basic_qty=?, target_basic_val=?, target_casual_qty=?, target_casual_val=?,
+         target_fashion_qty=?, target_fashion_val=?, confirm_qty=?, confirm_value=?
+         WHERE sales_target_id=? AND month=?`,
+        [target_basic_qty || 0, target_basic_val || 0, target_casual_qty || 0, target_casual_val || 0,
+        target_fashion_qty || 0, target_fashion_val || 0, confirm_qty || 0, confirm_value || 0, id, month]
+      );
+    } else {
+      await db.runExec(
+        `INSERT INTO sales_target_months (sales_target_id, month, target_basic_qty, target_basic_val, target_casual_qty, target_casual_val, target_fashion_qty, target_fashion_val, confirm_qty, confirm_value)
+         VALUES (?,?,?,?,?,?,?,?,?,?)`,
+        [id, month, target_basic_qty || 0, target_basic_val || 0, target_casual_qty || 0, target_casual_val || 0,
+          target_fashion_qty || 0, target_fashion_val || 0, confirm_qty || 0, confirm_value || 0]
+      );
+    }
+    res.json({ message: "Month updated successfully" });
+  } catch (e) {
+    handleError(res, e, "PUT /api/sales-targets/:id/months/:month");
+  }
+});
+
+// PUT lock a confirmed month row
+app.put('/api/sales-targets/:id/months/:month/lock', async (req, res) => {
+  try {
+    const { id, month } = req.params;
+    await db.runExec(
+      `UPDATE sales_target_months SET is_locked=1 WHERE sales_target_id=? AND month=?`, [id, month]);
+    res.json({ message: "Month locked successfully" });
+  } catch (e) {
+    handleError(res, e, "PUT /api/sales-targets/:id/months/:month/lock");
+  }
+});
+
+// DELETE sales target (header + months)
+app.delete('/api/sales-targets/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await db.runExec(`DELETE FROM sales_target_months WHERE sales_target_id=?`, [id]);
+    await db.runExec(`DELETE FROM sales_targets WHERE id=?`, [id]);
+    res.json({ message: "Sales target deleted" });
+  } catch (e) {
+    handleError(res, e, "DELETE /api/sales-targets/:id");
+  }
+});
+
+// Master dropdown data endpoints
+app.get('/api/master/buying-agents', async (req, res) => {
+  try {
+    const rows = await db.runQuery(
+      `SELECT DISTINCT buying_agent FROM buyers WHERE buying_agent IS NOT NULL AND buying_agent != '' ORDER BY buying_agent`);
+    res.json(rows.map(r => r.buying_agent));
+  } catch (e) { handleError(res, e, "GET /api/master/buying-agents"); }
+});
+
+app.get('/api/master/buying-agent-merchants', async (req, res) => {
+  try {
+    const { buying_agent } = req.query;
+    let rows;
+    if (buying_agent) {
+      rows = await db.runQuery(
+        `SELECT DISTINCT buying_agent_merchant FROM buyers WHERE buying_agent=? AND buying_agent_merchant IS NOT NULL AND buying_agent_merchant != '' ORDER BY buying_agent_merchant`,
+        [buying_agent]);
+    } else {
+      rows = await db.runQuery(
+        `SELECT DISTINCT buying_agent_merchant FROM buyers WHERE buying_agent_merchant IS NOT NULL AND buying_agent_merchant != '' ORDER BY buying_agent_merchant`);
+    }
+    res.json(rows.map(r => r.buying_agent_merchant));
+  } catch (e) { handleError(res, e, "GET /api/master/buying-agent-merchants"); }
+});
+
+app.get('/api/master/brands', async (req, res) => {
+  try {
+    const rows = await db.runQuery(
+      `SELECT DISTINCT brand FROM buyers WHERE brand IS NOT NULL AND brand != '' ORDER BY brand`);
+    res.json(rows.map(r => r.brand));
+  } catch (e) { handleError(res, e, "GET /api/master/brands"); }
+});
+
+app.get('/api/master/seasons', async (req, res) => {
+  try {
+    const rows = await db.runQuery(
+      `SELECT DISTINCT season FROM buyers WHERE season IS NOT NULL AND season != '' ORDER BY season`);
+    res.json(rows.map(r => r.season));
+  } catch (e) { handleError(res, e, "GET /api/master/seasons"); }
+});
+
+app.get('/api/master/team-leaders', async (req, res) => {
+  try {
+    const rows = await db.runQuery(
+      `SELECT DISTINCT team_leader FROM buyers WHERE team_leader IS NOT NULL AND team_leader != '' ORDER BY team_leader`);
+    res.json(rows.map(r => r.team_leader));
+  } catch (e) { handleError(res, e, "GET /api/master/team-leaders"); }
+});
+
+app.get('/api/master/units', async (req, res) => {
+  try {
+    const rows = await db.runQuery(
+      `SELECT DISTINCT unit FROM users WHERE unit IS NOT NULL AND unit != '' ORDER BY unit`);
+    res.json(rows.map(r => r.unit));
+  } catch (e) { handleError(res, e, "GET /api/master/units"); }
+});
+
 
 // 4. Quotation Inquiry Endpoints
 app.get('/api/inquiries', async (req, res) => {
@@ -344,7 +532,30 @@ app.get('/api/inquiries', async (req, res) => {
   }
 });
 
+// Search inquiry by Style No — must be before /:id to avoid conflict
+app.get('/api/inquiries/by-style/:style_no', async (req, res) => {
+  try {
+    const { style_no } = req.params;
+    const rows = await db.runQuery(
+      `SELECT qi.id, qi.buyer_id, COALESCE(b.name, qi.buyer_name) as buyer_name, qi.brand, qi.style_no
+       FROM quotation_inquiries qi
+       LEFT JOIN buyers b ON qi.buyer_id = b.id
+       WHERE LOWER(qi.style_no) = LOWER(?)
+       ORDER BY qi.inquiry_date DESC
+       LIMIT 1`,
+      [style_no]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: `No inquiry found with Style No "${style_no}"` });
+    }
+    res.json(rows[0]);
+  } catch (e) {
+    handleError(res, e, 'GET /api/inquiries/by-style/:style_no');
+  }
+});
+
 app.get('/api/inquiries/:id', async (req, res) => {
+
   try {
     const { id } = req.params;
     const inquiry = await db.runQuery("SELECT * FROM quotation_inquiries WHERE id=?", [id]);
@@ -2659,18 +2870,55 @@ app.delete('/api/trims-bookings/:id', async (req, res) => {
 app.get('/api/analytics/sales-target-vs-achieved', async (req, res) => {
   try {
     const currentYear = new Date().getFullYear();
-    const rows = await db.runQuery(`
-      SELECT st.month, st.year, 
-             SUM(st.target_qty) as total_target_qty, 
-             SUM(st.target_value) as total_target_val,
-             SUM(st.confirm_qty) as total_confirm_qty, 
-             SUM(st.confirm_value) as total_confirm_val
-      FROM sales_targets st
-      WHERE st.year = ? AND st.status = 'Approved'
-      GROUP BY st.month, st.year
-    `, [currentYear]);
 
-    res.json(rows);
+    // First: backfill missing month rows for any old-style targets for current year
+    const oldTargets = await db.runQuery(
+      `SELECT st.id FROM sales_targets st WHERE st.year = ? AND NOT EXISTS (
+             SELECT 1 FROM sales_target_months WHERE sales_target_id = st.id
+           )`, [currentYear]);
+    for (const t of oldTargets) {
+      const MONTHS_ORDERED = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      for (const month of MONTHS_ORDERED) {
+        try {
+          await db.runExec(
+            `INSERT INTO sales_target_months (sales_target_id, month) VALUES (?, ?)`,
+            [t.id, month]
+          );
+        } catch (e) { /* ignore duplicate */ }
+      }
+    }
+
+    // Aggregate per month for current year
+    const rows = await db.runQuery(`
+          SELECT m.month,
+                 SUM(m.target_basic_qty + m.target_casual_qty + m.target_fashion_qty) as total_target_qty,
+                 SUM(m.target_basic_val + m.target_casual_val + m.target_fashion_val) as total_target_val,
+                 SUM(m.confirm_qty) as total_confirm_qty,
+                 SUM(m.confirm_value) as total_confirm_val,
+                 SUM(m.achieve_basic_qty + m.achieve_casual_qty + m.achieve_fashion_qty) as total_achieve_qty,
+                 SUM(m.achieve_basic_val + m.achieve_casual_val + m.achieve_fashion_val) as total_achieve_val
+          FROM sales_target_months m
+          JOIN sales_targets st ON m.sales_target_id = st.id
+          WHERE st.year = ?
+          GROUP BY m.month
+        `, [currentYear]);
+
+    // Build a full 12-month scaffold so chart always has bars
+    const MONTHS_ORDERED_MAP = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const monthMap = {};
+    rows.forEach((r) => { monthMap[r.month] = r; });
+
+    const chartData = MONTHS_ORDERED_MAP.map(mn => ({
+      month: mn.substring(0, 3), // Jan, Feb, etc.
+      total_target_qty: parseFloat(monthMap[mn]?.total_target_qty || 0),
+      total_target_val: parseFloat(monthMap[mn]?.total_target_val || 0),
+      total_confirm_qty: parseFloat(monthMap[mn]?.total_confirm_qty || 0),
+      total_confirm_val: parseFloat(monthMap[mn]?.total_confirm_val || 0),
+      total_achieve_qty: parseFloat(monthMap[mn]?.total_achieve_qty || 0),
+      total_achieve_val: parseFloat(monthMap[mn]?.total_achieve_val || 0),
+    }));
+
+    res.json(chartData);
   } catch (e) {
     handleError(res, e, "GET /api/analytics/sales-target-vs-achieved");
   }
@@ -2689,20 +2937,34 @@ app.get('/api/analytics/budget-spend', async (req, res) => {
   }
 });
 
-// Report: MIS Sales Target Vs Target Achieved
+// Report: MIS Sales Target Vs Target Achieved (only show Submitted and Approved targets)
 app.get('/api/reports/sales-target-mis', async (req, res) => {
   try {
     const rows = await db.runQuery(`
-      SELECT st.*, b.name as buyer_name, b.code as buyer_code
+      SELECT st.*, COALESCE(b.name, st.buyer_name) as buyer_name, b.code as buyer_code
       FROM sales_targets st
       LEFT JOIN buyers b ON st.buyer_id = b.id
-      ORDER BY st.year DESC, st.month DESC
+      WHERE st.status IN ('Submitted', 'Approved')
+      ORDER BY st.year DESC, st.id DESC
     `);
     res.json(rows);
   } catch (e) {
     handleError(res, e, "GET /api/reports/sales-target-mis");
   }
 });
+
+// PUT update status of sales target
+app.put('/api/sales-targets/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    await db.runExec("UPDATE sales_targets SET status=? WHERE id=?", [status, id]);
+    res.json({ message: `Sales target status updated to ${status} successfully` });
+  } catch (e) {
+    handleError(res, e, "PUT /api/sales-targets/:id/status");
+  }
+});
+
 
 // Report: T&A Progress Tracking Report
 app.get('/api/reports/ta-progress', async (req, res) => {

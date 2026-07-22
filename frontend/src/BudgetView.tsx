@@ -41,7 +41,7 @@ export function BudgetView({
   const [activeSubTab, setActiveSubTab] = useState<'directory' | 'approval'>(defaultSubTab);
 
   // creation modal tab: 'required' | 'others' | 'costs'
-  const [budgetTab, setBudgetTab] = useState<'required' | 'others' | 'costs'>('required');
+  const [budgetTab, setBudgetTab] = useState<'required' | 'others' | 'costs' | 'costing'>('required');
 
   // Permission simulation role: 'super_admin' | 'admin_user' | 'unit_user' | 'merchandiser_manager_md'
   const [simulatedRole, setSimulatedRole] = useState<'super_admin' | 'admin_user' | 'unit_user' | 'merchandiser_manager_md'>(
@@ -928,6 +928,10 @@ export function BudgetView({
           setEmbCost(detail.embs?.reduce((sum: number, e: any) => sum + parseFloat(e.amount || 0), 0) * (styleQty / 12) || 0);
           setWashCost(detail.washes?.reduce((sum: number, w: any) => sum + parseFloat(w.amount || 0), 0) * (styleQty / 12) || 0);
           setCmCost(parseFloat(detail.cm_value || 0) * (styleQty / 12) || 0);
+          const avgFobVal = order.pos && order.pos.length > 0
+            ? (order.pos.reduce((sum: number, p: any) => sum + (p.fob_price || 0), 0) / order.pos.length)
+            : (detail.total_cost || 0);
+          setCalcPriceDzn(Number((avgFobVal * 12).toFixed(4)));
         }
       } catch (e) { console.error("Error getting order details", e); }
 
@@ -980,6 +984,10 @@ export function BudgetView({
           setEmbCost(quote.embs?.reduce((sum: number, e: any) => sum + parseFloat(e.amount || 0), 0) * ((inq.offer_qty || 10000) / 12) || 0);
           setWashCost(quote.washes?.reduce((sum: number, w: any) => sum + parseFloat(w.amount || 0), 0) * ((inq.offer_qty || 10000) / 12) || 0);
           setCmCost(parseFloat(quote.cm_value || 0) * ((inq.offer_qty || 10000) / 12) || 0);
+          const avgFobVal = matchingOrder?.pos && matchingOrder.pos.length > 0
+            ? (matchingOrder.pos.reduce((sum: number, p: any) => sum + (p.fob_price || 0), 0) / matchingOrder.pos.length)
+            : (quote.total_cost || 0);
+          setCalcPriceDzn(Number((avgFobVal * 12).toFixed(4)));
         }
       } catch (e) { console.error("Error getting quotation details", e); }
 
@@ -1030,6 +1038,10 @@ export function BudgetView({
             setEmbCost(detail.embs?.reduce((sum: number, e: any) => sum + parseFloat(e.amount || 0), 0) * ((inq.offer_qty || 10000) / 12) || 0);
             setWashCost(detail.washes?.reduce((sum: number, w: any) => sum + parseFloat(w.amount || 0), 0) * ((inq.offer_qty || 10000) / 12) || 0);
             setCmCost(parseFloat(detail.cm_value || 0) * ((inq.offer_qty || 10000) / 12) || 0);
+            const avgFobVal = matchingOrder?.pos && matchingOrder.pos.length > 0
+              ? (matchingOrder.pos.reduce((sum: number, p: any) => sum + (p.fob_price || 0), 0) / matchingOrder.pos.length)
+              : (detail.total_cost || 0);
+            setCalcPriceDzn(Number((avgFobVal * 12).toFixed(4)));
           }
         } catch (err) { console.error("Error setting style detail", err); }
       }
@@ -1294,6 +1306,8 @@ export function BudgetView({
       setCommlDetailsList(data.commls || []);
       setCommissionDetailsList(data.commissions || []);
       setOthersDetailsList(data.others || []);
+
+      resetCalculator(data);
 
       setBudgetTab('required');
       setShowModal(true);
@@ -1819,6 +1833,7 @@ export function BudgetView({
               <div className={`tab ${budgetTab === 'required' ? 'active' : ''}`} onClick={() => setBudgetTab('required')}>1st Tab (Required Info)</div>
               <div className={`tab ${budgetTab === 'others' ? 'active' : ''}`} onClick={() => setBudgetTab('others')}>2nd Tab (Others Info)</div>
               <div className={`tab ${budgetTab === 'costs' ? 'active' : ''}`} onClick={() => setBudgetTab('costs')}>List of all Costs</div>
+              <div className={`tab ${budgetTab === 'costing' ? 'active' : ''}`} onClick={() => setBudgetTab('costing')}>Costing</div>
             </div>
 
             {budgetTab === 'required' && (
@@ -2238,6 +2253,129 @@ export function BudgetView({
               </div>
             )}
 
+            {budgetTab === 'costing' && (
+              <div>
+                <h4 style={{ marginBottom: '16px' }}>Detailed Costing Breakdown & Margin Estimation</h4>
+
+                <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+                  
+                  {/* Left Column: Costing Summary per unit/dozen */}
+                  <div style={{ background: 'rgba(255,255,255,0.01)', padding: '20px', borderRadius: '8px', border: '1px solid var(--border-muted)' }}>
+                    <h5 style={{ color: '#0284c7', fontWeight: 'bold', marginBottom: '15px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Cost Summary</h5>
+                    <table className="data-table" style={{ width: '100%', fontSize: '0.85rem' }}>
+                      <thead>
+                        <tr>
+                          <th>Particulars</th>
+                          <th style={{ textAlign: 'right' }}>Total Budget</th>
+                          <th style={{ textAlign: 'right' }}>Cost / Pcs</th>
+                          <th style={{ textAlign: 'right' }}>Cost / Dzn</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          ['Fabric Cost', fabricCost],
+                          ['Trims Cost', trimsCost],
+                          ['Emb. Cost', embCost],
+                          ['Wash Cost', washCost],
+                          ['CM Cost', cmCost],
+                          ['Comml. Cost', commlCost],
+                          ['Commission Cost', commissionCost],
+                          ['Other Costs', otherCost + labTest + inspectionCost + sampleCost + freightCost + courierCost + certifCost + commonOH + deffdLC + designCost + studioCost + opertExp + incomeTax],
+                        ].map(([label, val]: any) => {
+                          const valNum = parseFloat(val) || 0;
+                          const pcsVal = totalQuantity > 0 ? (valNum / totalQuantity) : 0;
+                          const dznVal = pcsVal * 12;
+                          return (
+                            <tr key={label}>
+                              <td>{label}</td>
+                              <td style={{ textAlign: 'right' }}>${valNum.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td style={{ textAlign: 'right' }}>${pcsVal.toFixed(4)}</td>
+                              <td style={{ textAlign: 'right' }}>${dznVal.toFixed(4)}</td>
+                            </tr>
+                          );
+                        })}
+                        <tr style={{ fontWeight: 'bold', background: 'var(--bg-dark)' }}>
+                          <td>GRAND TOTAL</td>
+                          <td style={{ textAlign: 'right' }}>${calculatedTotalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td style={{ textAlign: 'right' }}>${(totalQuantity > 0 ? (calculatedTotalCost / totalQuantity) : 0).toFixed(4)}</td>
+                          <td style={{ textAlign: 'right' }}>${(totalQuantity > 0 ? (calculatedTotalCost / totalQuantity * 12) : 0).toFixed(4)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Right Column: Pricing & Margin Estimation */}
+                  <div style={{ background: 'rgba(255,255,255,0.01)', padding: '20px', borderRadius: '8px', border: '1px solid var(--border-muted)', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                    <h5 style={{ color: '#0284c7', fontWeight: 'bold', marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Margin Calculator</h5>
+                    
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 600 }}>Target Price (FOB) per Pcs ($)</label>
+                      <input
+                        type="number"
+                        className="form-control"
+                        step="any"
+                        value={(calcPriceDzn / 12) || 0}
+                        onChange={e => {
+                          const val = parseFloat(e.target.value) || 0;
+                          setCalcPriceDzn(val * 12);
+                        }}
+                        style={{ fontSize: '1rem', fontWeight: 'bold', border: '1px solid var(--primary)' }}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 600 }}>Target Price (FOB) per Dozen ($)</label>
+                      <input
+                        type="number"
+                        className="form-control"
+                        step="any"
+                        value={calcPriceDzn || 0}
+                        onChange={e => {
+                          const val = parseFloat(e.target.value) || 0;
+                          setCalcPriceDzn(val);
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ marginTop: '10px', padding: '15px', background: 'var(--bg-dark)', borderRadius: '6px', display: 'flex', flexDirection: 'column', gap: '10px', border: '1px solid var(--border-muted)' }}>
+                      {(() => {
+                        const totalCostPcs = totalQuantity > 0 ? (calculatedTotalCost / totalQuantity) : 0;
+                        const pricePcs = calcPriceDzn / 12;
+                        const marginPcs = pricePcs - totalCostPcs;
+                        const marginPct = pricePcs > 0 ? (marginPcs / pricePcs) * 100 : 0;
+
+                        return (
+                          <>
+                            <div className="d-flex justify-between" style={{ fontSize: '0.9rem' }}>
+                              <span>Total Cost per Pcs:</span>
+                              <span style={{ fontWeight: 600 }}>${totalCostPcs.toFixed(4)}</span>
+                            </div>
+                            <div className="d-flex justify-between" style={{ fontSize: '0.9rem' }}>
+                              <span>Price per Pcs:</span>
+                              <span style={{ fontWeight: 600 }}>${pricePcs.toFixed(4)}</span>
+                            </div>
+                            <div className="d-flex justify-between align-center" style={{ fontSize: '1rem', borderTop: '1px solid var(--border-muted)', paddingTop: '10px' }}>
+                              <span style={{ fontWeight: 'bold' }}>Net Margin per Pcs:</span>
+                              <span style={{ fontWeight: 'bold', color: marginPcs >= 0 ? 'var(--secondary)' : 'var(--warning)', fontSize: '1.1rem' }}>
+                                ${marginPcs.toFixed(4)}
+                              </span>
+                            </div>
+                            <div className="d-flex justify-between align-center" style={{ fontSize: '1rem' }}>
+                              <span style={{ fontWeight: 'bold' }}>Margin Ratio (%):</span>
+                              <span style={{ fontWeight: 'bold', color: marginPcs >= 0 ? 'var(--secondary)' : 'var(--warning)', fontSize: '1.1rem' }}>
+                                {marginPct.toFixed(2)}%
+                              </span>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            )}
+
             <div className="mt-20 text-right" style={{ borderTop: '1px solid var(--border-muted)', paddingTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               {budgetTab === 'required' && (
                 <>
@@ -2266,6 +2404,12 @@ export function BudgetView({
               {budgetTab === 'costs' && (
                 <>
                   <button type="button" className="btn btn-secondary" onClick={() => setBudgetTab('others')}>Back</button>
+                  <button type="button" className="btn btn-primary" onClick={() => setBudgetTab('costing')}>Next: Costing</button>
+                </>
+              )}
+              {budgetTab === 'costing' && (
+                <>
+                  <button type="button" className="btn btn-secondary" onClick={() => setBudgetTab('costs')}>Back</button>
                   <button type="button" className="btn btn-primary" onClick={handleSaveBudget}><Save size={16} /> Save & File Budget</button>
                 </>
               )}

@@ -256,7 +256,7 @@ export default function App() {
         <div className="sidebar-header">
           <div className="sidebar-header-left">
             <div className="user-avatar" style={{ background: 'var(--primary-gradient)', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', fontWeight: 'bold', flexShrink: 0 }}>M</div>
-            <span className="sidebar-logo">METAMORPHOSIS</span>
+            <span className="sidebar-logo">MerchTrack</span>
           </div>
           <button
             type="button"
@@ -486,7 +486,7 @@ export default function App() {
 
         <div className="content-body">
           {activeTab === 'dashboard' && <DashboardView setActiveTab={setActiveTab} />}
-          {activeTab === 'crm' && <SalesTargetView buyers={buyers} />}
+          {activeTab === 'crm' && <SalesTargetView buyers={buyers} currentUser={currentUser} />}
           {activeTab === 'crm_mis' && <SalesTargetMISView buyers={buyers} />}
           {activeTab === 'inquiry' && <QuotationModule buyers={buyers} />}
           {activeTab === 'quotation_approval' && <QuotationApprovalView buyers={buyers} />}
@@ -619,24 +619,21 @@ function DashboardView({ setActiveTab: _setActiveTab }: { setActiveTab: any }) {
             <h2 className="card-title"><Target size={18} /> Sales Target vs Confirmed Achievement ({new Date().getFullYear()})</h2>
           </div>
           <div style={{ width: '100%', height: 300 }}>
-            {salesData.length === 0 ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
-                No approved targets / confirmed orders found to graph.
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={salesData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-muted)" />
-                  <XAxis dataKey="month" stroke="var(--text-secondary)" />
-                  <YAxis stroke="var(--text-secondary)" />
-                  <Tooltip contentStyle={{ backgroundColor: 'var(--bg-dark)', borderColor: 'var(--border-muted)' }} />
-                  <Legend />
-                  <Bar dataKey="total_target_val" name="Target Value ($)" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="total_confirm_val" name="Confirmed Value ($)" fill="#10b981" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={salesData.length > 0 ? salesData : Array.from({ length: 12 }, (_, i) => ({ month: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][i], total_target_val: 0, total_confirm_val: 0, total_achieve_val: 0 }))} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-muted)" />
+                <XAxis dataKey="month" stroke="var(--text-secondary)" tick={{ fontSize: 11 }} />
+                <YAxis stroke="var(--text-secondary)" tick={{ fontSize: 11 }} tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
+                <Tooltip contentStyle={{ backgroundColor: 'var(--bg-dark)', borderColor: 'var(--border-muted)', borderRadius: '8px' }}
+                  formatter={(value: any) => [`$${parseFloat(value).toLocaleString()}`, '']} />
+                <Legend />
+                <Bar dataKey="total_target_val" name="Target Value ($)" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="total_confirm_val" name="Confirmed ($)" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="total_achieve_val" name="Achieved ($)" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
+
         </div>
 
         <div className="dashboard-card">
@@ -669,32 +666,60 @@ function DashboardView({ setActiveTab: _setActiveTab }: { setActiveTab: any }) {
 }
 
 // ==========================================================================
-// SUB-VIEW: CRM & Sales Target (Includes ALL spreadsheet fields)
+// SUB-VIEW: CRM & Sales Target — Full Redesign
 // ==========================================================================
-function SalesTargetView({ buyers }: { buyers: any[] }) {
+const MONTHS_LIST = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const YEARS_LIST = [2024, 2025, 2026, 2027, 2028, 2029, 2030];
+
+function SalesTargetView({ buyers, currentUser }: { buyers: any[], currentUser: any }) {
+  type SubView = 'list' | 'create' | 'edit' | 'view';
+  const [subView, setSubView] = useState<SubView>('list');
   const [targets, setTargets] = useState<any[]>([]);
-  const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({
+  const [selectedTarget, setSelectedTarget] = useState<any>(null);
+
+  // Master dropdown data
+  const [masterBuyingAgents, setMasterBuyingAgents] = useState<string[]>([]);
+  const [masterMerchants, setMasterMerchants] = useState<string[]>([]);
+  const [masterBrands, setMasterBrands] = useState<string[]>([]);
+  const [masterSeasons, setMasterSeasons] = useState<string[]>([]);
+  const [masterTeamLeaders, setMasterTeamLeaders] = useState<string[]>([]);
+
+  // Form state
+  const blankForm = {
+    unit: currentUser?.unit || '',
     buyer_id: '',
+    buyer_name: '',
     brand: '',
-    buying_agent: '',
-    buying_agent_merchant: '',
+    style_id: '',
     team_leader: '',
     season: '',
     year: new Date().getFullYear(),
-    month: 'January',
-    target_basic_qty: 0,
-    target_basic_val: 0,
-    target_casual_qty: 0,
-    target_casual_val: 0,
-    target_fashion_qty: 0,
-    target_fashion_val: 0,
-    status: 'Draft'
-  });
+  };
+  const blankMonths = MONTHS_LIST.map(m => ({
+    month: m,
+    target_basic_qty: 0, target_basic_val: 0,
+    target_casual_qty: 0, target_casual_val: 0,
+    target_fashion_qty: 0, target_fashion_val: 0,
+    confirm_qty: 0, confirm_value: 0,
+    is_locked: 0
+  }));
 
-  useEffect(() => {
-    fetchTargets();
-  }, []);
+  const [form, setForm] = useState<any>({ ...blankForm });
+  const [monthRows, setMonthRows] = useState<any[]>(blankMonths);
+  const [showConfirmPopup, setShowConfirmPopup] = useState(false);
+  const [pendingSubmit, setPendingSubmit] = useState<(() => void) | null>(null);
+
+  // Filter + Role state for list view
+  const [filterMode, setFilterMode] = useState<'all' | 'year' | 'buyer' | 'status'>('all');
+  const [crmSimRole, setCrmSimRole] = useState('super_admin');
+  const [crmSearch, setCrmSearch] = useState('');
+  const [crmStatusFilter, setCrmStatusFilter] = useState('All');
+  const [crmYearFilter, setCrmYearFilter] = useState(String(new Date().getFullYear()));
+  const [crmBuyerFilter, setCrmBuyerFilter] = useState('');
+
+  useEffect(() => { fetchTargets(); fetchMasterData(); }, []);
+
+
 
   const fetchTargets = async () => {
     try {
@@ -704,237 +729,935 @@ function SalesTargetView({ buyers }: { buyers: any[] }) {
     } catch (e) { console.error(e); }
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.buyer_id || !form.team_leader || !form.season) {
-      alert("Please fill up all required fields.");
+  const fetchMasterData = async () => {
+    try {
+      const [agents, brands, seasons, leaders] = await Promise.all([
+        fetch(`${API_BASE}/master/buying-agents`).then(r => r.json()),
+        fetch(`${API_BASE}/master/brands`).then(r => r.json()),
+        fetch(`${API_BASE}/master/seasons`).then(r => r.json()),
+        fetch(`${API_BASE}/master/team-leaders`).then(r => r.json()),
+      ]);
+      setMasterBuyingAgents(agents);
+      setMasterBrands(brands);
+      setMasterSeasons(seasons);
+      setMasterTeamLeaders(leaders);
+    } catch (e) { console.error(e); }
+  };
+
+  const loadTargetForEdit = async (id: number) => {
+    try {
+      const res = await fetch(`${API_BASE}/sales-targets/${id}`);
+      const data = await res.json();
+      setSelectedTarget(data);
+      setForm({
+        unit: data.unit || currentUser?.unit || '',
+        buyer_id: String(data.buyer_id || ''),
+        buyer_name: data.buyer_name || '',
+        style_id: data.style_id || '',
+        brand: data.brand || '',
+        buying_agent: data.buying_agent || '',
+        buying_agent_merchant: data.buying_agent_merchant || '',
+        team_leader: data.team_leader || '',
+        season: data.season || '',
+        year: data.year || new Date().getFullYear(),
+        status: data.status || 'Draft'
+      });
+      setMonthRows(data.months || blankMonths);
+    } catch (e) { console.error(e); }
+  };
+
+  const loadTargetForView = async (id: number) => {
+    try {
+      const res = await fetch(`${API_BASE}/sales-targets/${id}`);
+      const data = await res.json();
+      setSelectedTarget(data);
+      setSubView('view');
+    } catch (e) { console.error(e); }
+  };
+
+  const validateAndSubmit = (submitFn: () => void) => {
+    const buyerVal = (form.buyer_name || '').trim();
+    if (!buyerVal) {
+      alert('Please fill in the Buyer field.');
       return;
     }
+    setPendingSubmit(() => submitFn);
+    setShowConfirmPopup(true);
+  };
 
-    // Popup confirmation check (Excel constraint)
-    const proceed = window.confirm("You are creating sales Target & Month\nDo you want to proceed?");
-    if (!proceed) return;
+  // Filtered targets for list view
+  const getFilteredTargets = () => {
+    let list = [...targets];
+    const q = crmSearch.trim().toLowerCase();
+    if (q) {
+      list = list.filter(t =>
+        (t.buyer_name || '').toLowerCase().includes(q) ||
+        (String(t.id)).includes(q) ||
+        (t.buying_agent || '').toLowerCase().includes(q) ||
+        (t.team_leader || '').toLowerCase().includes(q)
+      );
+    }
+    if (crmStatusFilter !== 'All') {
+      list = list.filter(t => (t.status || '').toLowerCase() === crmStatusFilter.toLowerCase());
+    }
+    if (filterMode === 'year') {
+      list = list.filter(t => String(t.year) === crmYearFilter);
+    } else if (filterMode === 'buyer' && crmBuyerFilter) {
+      list = list.filter(t => String(t.buyer_id) === crmBuyerFilter || (t.buyer_name || '').toLowerCase().includes(crmBuyerFilter.toLowerCase()));
+    }
+    // Role-based filter simulation
+    if (crmSimRole === 'merchandiser') {
+      const name = currentUser?.name || '';
+      list = list.filter(t => (t.team_leader || '').toLowerCase() === name.toLowerCase() || name === '');
+    }
+    return list;
+  };
 
-    // Totals calculate
-    const totalQty = parseFloat(form.target_basic_qty as any || 0) + parseFloat(form.target_casual_qty as any || 0) + parseFloat(form.target_fashion_qty as any || 0);
-    const totalVal = parseFloat(form.target_basic_val as any || 0) + parseFloat(form.target_casual_val as any || 0) + parseFloat(form.target_fashion_val as any || 0);
-
-    const payload = {
-      ...form,
-      target_qty: totalQty,
-      target_value: totalVal
-    };
-
+  const handleCreate = async () => {
     try {
       const res = await fetch(`${API_BASE}/sales-targets`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(form)
       });
-      if (res.ok) {
-        setShowModal(false);
-        fetchTargets();
+      const data = await res.json();
+      if (res.ok && data.id) {
+        // Save month rows
+        for (const row of monthRows) {
+          const hasData = row.target_basic_qty || row.target_basic_val || row.target_casual_qty ||
+            row.target_casual_val || row.target_fashion_qty || row.target_fashion_val;
+          if (hasData) {
+            await fetch(`${API_BASE}/sales-targets/${data.id}/months/${row.month}`, {
+              method: 'PUT', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(row)
+            });
+          }
+        }
+        await fetchTargets();
+        setSubView('list');
+        setForm({ ...blankForm, unit: currentUser?.unit || '' });
+        setMonthRows(blankMonths);
       }
     } catch (e) { console.error(e); }
   };
 
-  const handleApprove = async (id: number) => {
+  const handleUpdate = async () => {
     try {
-      const target = targets.find(t => t.id === id);
-      await fetch(`${API_BASE}/sales-targets/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...target, status: 'Approved' })
+      await fetch(`${API_BASE}/sales-targets/${selectedTarget.id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form)
       });
-      fetchTargets();
+      // Save unlocked month rows
+      for (const row of monthRows) {
+        if (!row.is_locked) {
+          await fetch(`${API_BASE}/sales-targets/${selectedTarget.id}/months/${row.month}`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(row)
+          });
+        }
+      }
+      await fetchTargets();
+      setSubView('list');
     } catch (e) { console.error(e); }
   };
 
-  return (
-    <div className="dashboard-card">
-      <div className="card-header">
-        <h2 className="card-title"><Target /> Sales Target Tracking (CRM)</h2>
-        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-          <Plus size={16} /> New CRM Target
-        </button>
-      </div>
+  const handleLockMonth = async (month: string) => {
+    if (!selectedTarget) return;
+    await fetch(`${API_BASE}/sales-targets/${selectedTarget.id}/months/${encodeURIComponent(month)}/lock`, { method: 'PUT' });
+    setMonthRows(prev => prev.map(r => r.month === month ? { ...r, is_locked: 1 } : r));
+  };
 
-      <div className="table-wrapper">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Buyer</th>
-              <th>Brand</th>
-              <th>Season</th>
-              <th>Year</th>
-              <th>Month</th>
-              <th>Leader</th>
-              <th>Target basic Qty</th>
-              <th>Target casual Qty</th>
-              <th>Target fashion Qty</th>
-              <th>Total Qty</th>
-              <th>Total Value</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {targets.map((t, idx) => {
-              const isLocked = t.status === 'Approved';
-              return (
-                <tr key={idx}>
-                  <td><strong>{t.buyer_name}</strong></td>
-                  <td>{t.brand}</td>
-                  <td>{t.season}</td>
-                  <td>{t.year}</td>
-                  <td>{t.month}</td>
-                  <td>{t.team_leader}</td>
-                  <td>{parseFloat(t.target_basic_qty || 0).toLocaleString()}</td>
-                  <td>{parseFloat(t.target_casual_qty || 0).toLocaleString()}</td>
-                  <td>{parseFloat(t.target_fashion_qty || 0).toLocaleString()}</td>
-                  <td><strong>{parseFloat(t.target_qty).toLocaleString()} pcs</strong></td>
-                  <td><strong>${parseFloat(t.target_value).toLocaleString()}</strong></td>
+  const handleDelete = async (id: number) => {
+    if (!confirm('Delete this sales target and all month data?')) return;
+    await fetch(`${API_BASE}/sales-targets/${id}`, { method: 'DELETE' });
+    fetchTargets();
+  };
+
+  const handleUpdateStatus = async (id: number, status: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/sales-targets/${id}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      if (res.ok) {
+        await fetchTargets();
+      }
+    } catch (e) { console.error(e); }
+  };
+
+
+  const updateMonthRow = (month: string, field: string, value: number) => {
+    setMonthRows(prev => prev.map(r => r.month === month ? { ...r, [field]: value } : r));
+  };
+
+  // Totals per row
+  const getRowTotals = (row: any) => {
+    const tQty = (row.target_basic_qty || 0) + (row.target_casual_qty || 0) + (row.target_fashion_qty || 0);
+    const tVal = (row.target_basic_val || 0) + (row.target_casual_val || 0) + (row.target_fashion_val || 0);
+    return { tQty, tVal };
+  };
+
+  // ---- Custom YES/NO Confirmation Popup ----
+  const ConfirmPopup = () => (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.7)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center'
+    }}>
+      <div style={{
+        background: 'var(--bg-card)', border: '1px solid var(--border-muted)', borderRadius: '16px',
+        padding: '40px 48px', maxWidth: '440px', width: '100%', textAlign: 'center',
+        boxShadow: '0 24px 60px rgba(0,0,0,0.5)'
+      }}>
+        <div style={{ fontSize: '3rem', marginBottom: '12px' }}>🎯</div>
+        <h3 style={{ color: 'var(--text-primary)', marginBottom: '12px', fontSize: '1.3rem' }}>
+          Create Sales Target
+        </h3>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: '28px', lineHeight: 1.6 }}>
+          You are creating a <strong>Sales Target & Month</strong> record.<br />
+          Do you want to proceed?
+        </p>
+        <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
+          <button
+            className="btn btn-secondary"
+            style={{ minWidth: '100px' }}
+            onClick={() => { setShowConfirmPopup(false); setPendingSubmit(null); }}
+          >
+            NO
+          </button>
+          <button
+            className="btn btn-primary"
+            style={{ minWidth: '100px' }}
+            onClick={() => {
+              setShowConfirmPopup(false);
+              if (pendingSubmit) pendingSubmit();
+              setPendingSubmit(null);
+            }}
+          >
+            YES
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ---- Auto-fill from Quotation Inquiry by Style No ----
+  const [autoFillLoading, setAutoFillLoading] = useState(false);
+  const [autoFillMsg, setAutoFillMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const autoFillFromInquiry = async () => {
+    const styleNo = (form.style_id || '').trim();
+    if (!styleNo) {
+      setAutoFillMsg({ type: 'error', text: 'Please enter a Style ID first.' });
+      return;
+    }
+    setAutoFillLoading(true);
+    setAutoFillMsg(null);
+    try {
+      const res = await fetch(`${API_BASE}/inquiries/by-style/${encodeURIComponent(styleNo)}`);
+      if (!res.ok) {
+        setAutoFillMsg({ type: 'error', text: `No Quotation Inquiry found with Style No "${styleNo}".` });
+        return;
+      }
+      const data = await res.json();
+      setForm((f: any) => ({
+        ...f,
+        buyer_name: data.buyer_name || f.buyer_name,
+        buyer_id: '',
+        brand: data.brand || f.brand,
+      }));
+      setAutoFillMsg({ type: 'success', text: `✓ Auto-filled — Buyer: "${data.buyer_name}"${data.brand ? `, Brand: "${data.brand}"` : ''}` });
+    } catch {
+      setAutoFillMsg({ type: 'error', text: 'Server error. Check connection.' });
+    } finally {
+      setAutoFillLoading(false);
+    }
+  };
+
+  // ---- Header Form (shared between create & edit) ----
+  const HeaderForm = () => (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '16px' }}>
+        <div className="form-group">
+          <label className="form-label">Buyer *</label>
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Enter Buyer name..."
+            value={form.buyer_name || ''}
+            onChange={e => setForm((f: any) => ({ ...f, buyer_name: e.target.value, buyer_id: '' }))}
+            required
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Brand</label>
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Enter Brand name..."
+            value={form.brand || ''}
+            onChange={e => setForm((f: any) => ({ ...f, brand: e.target.value }))}
+          />
+        </div>
+        <div className="form-group">
+          <label
+            className="form-label"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}
+          >
+            <span>Style ID</span>
+            <button
+              type="button"
+              onClick={autoFillFromInquiry}
+              disabled={autoFillLoading}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '4px',
+                padding: '3px 10px', fontSize: '0.72rem', fontWeight: 600,
+                background: autoFillLoading ? 'var(--bg-dark)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                color: '#fff', border: 'none', borderRadius: '5px',
+                cursor: autoFillLoading ? 'not-allowed' : 'pointer',
+                boxShadow: '0 1px 6px rgba(99,102,241,0.3)',
+                opacity: autoFillLoading ? 0.65 : 1,
+                transition: 'all 0.2s',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {autoFillLoading ? '⏳ Loading...' : '⚡ Get & Auto Fill'}
+            </button>
+          </label>
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Enter Style No from Quotation Inquiry..."
+            value={form.style_id || ''}
+            onChange={e => { setForm((f: any) => ({ ...f, style_id: e.target.value })); setAutoFillMsg(null); }}
+          />
+          {autoFillMsg && (
+            <div style={{
+              marginTop: '5px', fontSize: '0.75rem', fontWeight: 500,
+              color: autoFillMsg.type === 'success' ? '#10b981' : '#ef4444',
+              padding: '4px 8px', borderRadius: '4px',
+              background: autoFillMsg.type === 'success' ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)',
+              border: `1px solid ${autoFillMsg.type === 'success' ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`,
+            }}>
+              {autoFillMsg.text}
+            </div>
+          )}
+        </div>
+        <div className="form-group">
+          <label className="form-label">Year</label>
+          <select
+            className="form-control"
+            value={form.year || new Date().getFullYear()}
+            onChange={e => setForm((f: any) => ({ ...f, year: parseInt(e.target.value) }))}
+          >
+            {[2024, 2025, 2026, 2027, 2028].map(y => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ---- Month-wise grid ----
+  const MonthGrid = ({ editable }: { editable: boolean }) => (
+    <div style={{ overflowX: 'auto' }}>
+      <table className="data-table" style={{ minWidth: '1100px' }}>
+        <thead>
+          <tr>
+            <th rowSpan={2} style={{ background: 'var(--bg-dark)', minWidth: '110px' }}>Month</th>
+            <th colSpan={2} style={{ textAlign: 'center', background: 'rgba(99,102,241,0.18)', borderBottom: '2px solid #6366f1' }}>Basic</th>
+            <th colSpan={2} style={{ textAlign: 'center', background: 'rgba(16,185,129,0.18)', borderBottom: '2px solid #10b981' }}>Casual Basic</th>
+            <th colSpan={2} style={{ textAlign: 'center', background: 'rgba(245,158,11,0.18)', borderBottom: '2px solid #f59e0b' }}>Fashion</th>
+            <th colSpan={2} style={{ textAlign: 'center', background: 'rgba(239,68,68,0.12)', borderBottom: '2px solid #ef4444' }}>Total (Auto)</th>
+            {editable && <th rowSpan={2} style={{ background: 'var(--bg-dark)' }}>Actions</th>}
+          </tr>
+          <tr>
+            <th style={{ background: 'rgba(99,102,241,0.1)', fontSize: '0.75rem' }}>Target Qty (Pcs)</th>
+            <th style={{ background: 'rgba(99,102,241,0.1)', fontSize: '0.75rem' }}>Target Value</th>
+            <th style={{ background: 'rgba(16,185,129,0.1)', fontSize: '0.75rem' }}>Target Qty (Pcs)</th>
+            <th style={{ background: 'rgba(16,185,129,0.1)', fontSize: '0.75rem' }}>Target Value</th>
+            <th style={{ background: 'rgba(245,158,11,0.1)', fontSize: '0.75rem' }}>Target Qty (Pcs)</th>
+            <th style={{ background: 'rgba(245,158,11,0.1)', fontSize: '0.75rem' }}>Target Value</th>
+            <th style={{ background: 'rgba(239,68,68,0.08)', fontSize: '0.75rem', fontWeight: 700 }}>Total Qty</th>
+            <th style={{ background: 'rgba(239,68,68,0.08)', fontSize: '0.75rem', fontWeight: 700 }}>Total Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          {monthRows.map((row, idx) => {
+            const { tQty, tVal } = getRowTotals(row);
+            const locked = !!row.is_locked;
+            const isEditable = editable && !locked;
+            return (
+              <tr key={idx} style={{ background: locked ? 'rgba(16,185,129,0.05)' : undefined }}>
+                <td style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {locked && <Lock size={12} style={{ color: 'var(--secondary)' }} />}
+                  {row.month}
+                </td>
+                {/* Basic */}
+                <td>
+                  {isEditable ? (
+                    <input type="number" step="0.01" className="form-control" style={{ minWidth: '90px', padding: '4px 8px' }}
+                      value={row.target_basic_qty || 0}
+                      onChange={e => updateMonthRow(row.month, 'target_basic_qty', parseFloat(e.target.value) || 0)} />
+                  ) : <span>{(row.target_basic_qty || 0).toLocaleString()}</span>}
+                </td>
+                <td>
+                  {isEditable ? (
+                    <input type="number" step="0.01" className="form-control" style={{ minWidth: '90px', padding: '4px 8px' }}
+                      value={row.target_basic_val || 0}
+                      onChange={e => updateMonthRow(row.month, 'target_basic_val', parseFloat(e.target.value) || 0)} />
+                  ) : <span>{(row.target_basic_val || 0).toLocaleString()}</span>}
+                </td>
+                {/* Casual Basic */}
+                <td>
+                  {isEditable ? (
+                    <input type="number" step="0.01" className="form-control" style={{ minWidth: '90px', padding: '4px 8px' }}
+                      value={row.target_casual_qty || 0}
+                      onChange={e => updateMonthRow(row.month, 'target_casual_qty', parseFloat(e.target.value) || 0)} />
+                  ) : <span>{(row.target_casual_qty || 0).toLocaleString()}</span>}
+                </td>
+                <td>
+                  {isEditable ? (
+                    <input type="number" step="0.01" className="form-control" style={{ minWidth: '90px', padding: '4px 8px' }}
+                      value={row.target_casual_val || 0}
+                      onChange={e => updateMonthRow(row.month, 'target_casual_val', parseFloat(e.target.value) || 0)} />
+                  ) : <span>{(row.target_casual_val || 0).toLocaleString()}</span>}
+                </td>
+                {/* Fashion */}
+                <td>
+                  {isEditable ? (
+                    <input type="number" step="0.01" className="form-control" style={{ minWidth: '90px', padding: '4px 8px' }}
+                      value={row.target_fashion_qty || 0}
+                      onChange={e => updateMonthRow(row.month, 'target_fashion_qty', parseFloat(e.target.value) || 0)} />
+                  ) : <span>{(row.target_fashion_qty || 0).toLocaleString()}</span>}
+                </td>
+                <td>
+                  {isEditable ? (
+                    <input type="number" step="0.01" className="form-control" style={{ minWidth: '90px', padding: '4px 8px' }}
+                      value={row.target_fashion_val || 0}
+                      onChange={e => updateMonthRow(row.month, 'target_fashion_val', parseFloat(e.target.value) || 0)} />
+                  ) : <span>{(row.target_fashion_val || 0).toLocaleString()}</span>}
+                </td>
+                {/* Totals (auto) */}
+                <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{tQty.toLocaleString()}</td>
+                <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{tVal.toLocaleString()}</td>
+                {editable && (
                   <td>
-                    <span className={`badge badge-${t.status.toLowerCase()}`}>
-                      {t.status} {isLocked && <Lock size={12} style={{ marginLeft: '4px', verticalAlign: 'middle' }} />}
+                    {!locked ? (
+                      <button className="btn btn-success btn-sm" title="Confirm & Lock this month"
+                        style={{ fontSize: '0.7rem', padding: '3px 8px' }}
+                        onClick={() => handleLockMonth(row.month)}>
+                        <Lock size={11} /> Confirm
+                      </button>
+                    ) : (
+                      <span style={{ color: 'var(--secondary)', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <CheckCircle size={12} /> Locked
+                      </span>
+                    )}
+                  </td>
+                )}
+              </tr>
+            );
+          })}
+        </tbody>
+        <tfoot>
+          <tr style={{ background: 'var(--bg-dark)', fontWeight: 700 }}>
+            <td>TOTAL</td>
+            <td style={{ color: '#6366f1' }}>{monthRows.reduce((s, r) => s + (r.target_basic_qty || 0), 0).toLocaleString()}</td>
+            <td style={{ color: '#6366f1' }}>{monthRows.reduce((s, r) => s + (r.target_basic_val || 0), 0).toLocaleString()}</td>
+            <td style={{ color: '#10b981' }}>{monthRows.reduce((s, r) => s + (r.target_casual_qty || 0), 0).toLocaleString()}</td>
+            <td style={{ color: '#10b981' }}>{monthRows.reduce((s, r) => s + (r.target_casual_val || 0), 0).toLocaleString()}</td>
+            <td style={{ color: '#f59e0b' }}>{monthRows.reduce((s, r) => s + (r.target_fashion_qty || 0), 0).toLocaleString()}</td>
+            <td style={{ color: '#f59e0b' }}>{monthRows.reduce((s, r) => s + (r.target_fashion_val || 0), 0).toLocaleString()}</td>
+            <td style={{ color: 'var(--primary)', fontSize: '1rem' }}>
+              {monthRows.reduce((s, r) => s + (r.target_basic_qty || 0) + (r.target_casual_qty || 0) + (r.target_fashion_qty || 0), 0).toLocaleString()}
+            </td>
+            <td style={{ color: 'var(--primary)', fontSize: '1rem' }}>
+              {monthRows.reduce((s, r) => s + (r.target_basic_val || 0) + (r.target_casual_val || 0) + (r.target_fashion_val || 0), 0).toLocaleString()}
+            </td>
+            {editable && <td />}
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+
+  // ======================== LIST VIEW ========================
+  if (subView === 'list') {
+    return (
+      <div className="dashboard-card">
+        {showConfirmPopup && <ConfirmPopup />}
+        <div className="card-header" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '15px' }}>
+            <h2 className="card-title"><Target /> Sales Target Tracking (CRM)</h2>
+            <div style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
+
+              {/* Filter Mode */}
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <label style={{ fontWeight: 'bold', fontSize: '13px', color: 'var(--text-secondary)' }}>Filter Mode:</label>
+                <select
+                  className="form-control"
+                  style={{ width: 'auto', padding: '6px 12px', fontSize: '13px' }}
+                  value={filterMode}
+                  onChange={e => { setFilterMode(e.target.value as any); setCrmYearFilter(String(new Date().getFullYear())); setCrmBuyerFilter(''); }}
+                >
+                  <option value="all">Show All Targets</option>
+                  <option value="year">By Specific Year</option>
+                  <option value="buyer">By Specific Buyer</option>
+                  <option value="status">By Status</option>
+                </select>
+              </div>
+
+              {/* Simulate Role */}
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <label style={{ fontWeight: 'bold', fontSize: '13px', color: 'var(--text-secondary)' }}>Simulate Role:</label>
+                <select className="form-control" style={{ width: 'auto', padding: '6px 12px', fontSize: '13px' }} value={crmSimRole} onChange={e => setCrmSimRole(e.target.value)}>
+                  <option value="super_admin">Super Admin</option>
+                  <option value="production_manager">Production Manager</option>
+                  <option value="store_manager">Store Manager</option>
+                  <option value="merchandiser_manager">Merchandising Manager</option>
+                  <option value="merchandiser">Merchandiser</option>
+                  <option value="others">Others (Buyer)</option>
+                </select>
+              </div>
+
+              {/* New CRM Target Button */}
+              <button className="btn btn-primary" onClick={() => {
+                setForm({ ...blankForm, unit: currentUser?.unit || '' });
+                setMonthRows(blankMonths);
+                setSubView('create');
+              }}>
+                <Plus size={16} /> New CRM Target
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Search & Filter Bar */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px 20px', background: 'transparent' }}>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+            {/* Search Input */}
+            <div style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
+              <Search size={16} style={{ position: 'absolute', left: '12px', top: '10px', color: 'var(--text-muted)' }} />
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Search by Buyer, Ref#, Buying Agent, Team Leader..."
+                value={crmSearch}
+                onChange={e => setCrmSearch(e.target.value)}
+                style={{ paddingLeft: '36px', height: '36px', background: 'var(--bg-input)', border: '1px solid var(--border-muted)', borderRadius: '6px', color: 'var(--text-primary)' }}
+              />
+            </div>
+
+            {/* Status filter dropdown */}
+            <select
+              className="form-control"
+              value={crmStatusFilter}
+              onChange={e => setCrmStatusFilter(e.target.value)}
+              style={{ width: '180px', height: '36px', background: 'var(--bg-input)', border: '1px solid var(--border-muted)', borderRadius: '6px', color: 'var(--text-primary)' }}
+            >
+              <option value="All">All Statuses</option>
+              <option value="Draft">Draft</option>
+              <option value="Approved">Approved</option>
+            </select>
+
+            {/* Year filter (if filterMode === year) */}
+            {filterMode === 'year' && (
+              <select className="form-control" value={crmYearFilter} onChange={e => setCrmYearFilter(e.target.value)}
+                style={{ width: '130px', height: '36px', background: 'var(--bg-input)', border: '1px solid var(--border-muted)', borderRadius: '6px', color: 'var(--text-primary)' }}>
+                {YEARS_LIST.map(y => <option key={y} value={String(y)}>{y}</option>)}
+              </select>
+            )}
+
+            {/* Buyer filter (if filterMode === buyer) */}
+            {filterMode === 'buyer' && (
+              <input type="text" className="form-control" placeholder="Filter by buyer name..."
+                value={crmBuyerFilter} onChange={e => setCrmBuyerFilter(e.target.value)}
+                style={{ width: '200px', height: '36px', background: 'var(--bg-input)', border: '1px solid var(--border-muted)', borderRadius: '6px', color: 'var(--text-primary)' }} />
+            )}
+
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: '500', whiteSpace: 'nowrap' }}>
+              Found {getFilteredTargets().length} Target{getFilteredTargets().length !== 1 ? 's' : ''}
+            </div>
+          </div>
+        </div>
+
+        <div className="table-wrapper" style={{ overflowX: 'auto' }}>
+          <table className="data-table" style={{ minWidth: '1200px' }}>
+            <thead>
+              <tr>
+                <th rowSpan={2} style={{ minWidth: '50px' }}>Ref#</th>
+                <th rowSpan={2}>Buyer</th>
+                <th rowSpan={2}>Buying Agent</th>
+                <th colSpan={2} style={{ textAlign: 'center', background: 'rgba(99,102,241,0.15)', borderBottom: '2px solid #6366f1' }}>Basic</th>
+                <th colSpan={2} style={{ textAlign: 'center', background: 'rgba(16,185,129,0.15)', borderBottom: '2px solid #10b981' }}>Casual Basic</th>
+                <th colSpan={2} style={{ textAlign: 'center', background: 'rgba(245,158,11,0.15)', borderBottom: '2px solid #f59e0b' }}>Fashion</th>
+                <th colSpan={4} style={{ textAlign: 'center', background: 'rgba(239,68,68,0.12)', borderBottom: '2px solid #ef4444' }}>Total</th>
+                <th rowSpan={2}>Year</th>
+                <th rowSpan={2}>Status</th>
+                <th rowSpan={2}>Actions</th>
+              </tr>
+              <tr>
+                <th style={{ background: 'rgba(99,102,241,0.08)', fontSize: '0.7rem' }}>Tgt Qty</th>
+                <th style={{ background: 'rgba(99,102,241,0.08)', fontSize: '0.7rem' }}>Tgt Val</th>
+                <th style={{ background: 'rgba(16,185,129,0.08)', fontSize: '0.7rem' }}>Tgt Qty</th>
+                <th style={{ background: 'rgba(16,185,129,0.08)', fontSize: '0.7rem' }}>Tgt Val</th>
+                <th style={{ background: 'rgba(245,158,11,0.08)', fontSize: '0.7rem' }}>Tgt Qty</th>
+                <th style={{ background: 'rgba(245,158,11,0.08)', fontSize: '0.7rem' }}>Tgt Val</th>
+                <th style={{ background: 'rgba(239,68,68,0.06)', fontSize: '0.7rem' }}>Tgt Qty</th>
+                <th style={{ background: 'rgba(239,68,68,0.06)', fontSize: '0.7rem' }}>Tgt Val</th>
+                <th style={{ background: 'rgba(239,68,68,0.06)', fontSize: '0.7rem' }}>Ach Qty</th>
+                <th style={{ background: 'rgba(239,68,68,0.06)', fontSize: '0.7rem' }}>Ach Val</th>
+              </tr>
+            </thead>
+            <tbody>
+              {getFilteredTargets().length === 0 ? (
+                <tr><td colSpan={18} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                  No sales targets found. Click "New CRM Target" to create one.
+                </td></tr>
+              ) : getFilteredTargets().map((t, idx) => (
+                <tr key={idx}>
+                  <td><strong>{t.style_id || `ST-${String(t.id).padStart(4, '0')}`}</strong></td>
+                  <td><strong>{t.buyer_name || '—'}</strong></td>
+                  <td>{t.buying_agent || '—'}</td>
+                  {/* Basic */}
+                  <td style={{ color: '#6366f1' }}>{parseFloat(t.total_basic_qty || 0).toLocaleString()}</td>
+                  <td style={{ color: '#6366f1' }}>{parseFloat(t.total_basic_val || 0).toLocaleString()}</td>
+                  {/* Casual Basic */}
+                  <td style={{ color: '#10b981' }}>{parseFloat(t.total_casual_qty || 0).toLocaleString()}</td>
+                  <td style={{ color: '#10b981' }}>{parseFloat(t.total_casual_val || 0).toLocaleString()}</td>
+                  {/* Fashion */}
+                  <td style={{ color: '#f59e0b' }}>{parseFloat(t.total_fashion_qty || 0).toLocaleString()}</td>
+                  <td style={{ color: '#f59e0b' }}>{parseFloat(t.total_fashion_val || 0).toLocaleString()}</td>
+                  {/* Total */}
+                  <td style={{ fontWeight: 700 }}>{parseFloat(t.target_qty || 0).toLocaleString()}</td>
+                  <td style={{ fontWeight: 700 }}>{parseFloat(t.target_value || 0).toLocaleString()}</td>
+                  <td style={{ color: 'var(--secondary)', fontWeight: 600 }}>{parseFloat(t.achieve_qty || 0).toLocaleString()}</td>
+                  <td style={{ color: 'var(--secondary)', fontWeight: 600 }}>{parseFloat(t.achieve_value || 0).toLocaleString()}</td>
+                  <td>{t.year}</td>
+                  <td>
+                    <span className={`badge badge-${(t.status || 'draft').toLowerCase()}`}>
+                      {t.status}
                     </span>
                   </td>
                   <td>
-                    {t.status === 'Draft' ? (
-                      <button className="btn btn-success btn-sm" onClick={() => handleApprove(t.id)}>
-                        Approve
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'nowrap', alignItems: 'center' }}>
+                      <button className="btn btn-xs" style={{ padding: '3px 8px', background: 'rgba(99,102,241,0.15)', color: '#6366f1', border: '1px solid #6366f1', borderRadius: '6px', fontSize: '0.72rem' }}
+                        title="View Details" onClick={() => loadTargetForView(t.id)}>
+                        <Eye size={12} /> View
                       </button>
-                    ) : (
-                      <span className="text-muted"><Lock size={14} /> Locked</span>
-                    )}
+                      <button className="btn btn-xs" style={{ padding: '3px 8px', background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid #f59e0b', borderRadius: '6px', fontSize: '0.72rem' }}
+                        title="Edit" onClick={async () => { await loadTargetForEdit(t.id); setSubView('edit'); }}>
+                        <Edit size={12} /> Edit
+                      </button>
+                      <button className="btn btn-xs" style={{ padding: '3px 8px', background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: '1px solid #ef4444', borderRadius: '6px', fontSize: '0.72rem' }}
+                        title="Delete" onClick={() => handleDelete(t.id)}>
+                        <Trash2 size={12} />
+                      </button>
+                      <button className="btn btn-xs" style={{ padding: '3px 8px', background: 'rgba(99,102,241,0.15)', color: '#6366f1', border: '1px solid #6366f1', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 600 }}
+                        title="Submit to Manager" onClick={() => { if (confirm('Submit this Sales Target to Manager?')) handleUpdateStatus(t.id, 'Submitted'); }}>
+                        ⚡ Submit
+                      </button>
+
+                      {t.status === 'Approved' && (
+                        <span className="badge badge-approved" style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981', border: '1px solid #10b981', padding: '3px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600 }}>
+                          ✓ Approved
+                        </span>
+                      )}
+                      {t.status === 'Rejected' && (
+                        <span className="badge badge-rejected" style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: '1px solid #ef4444', padding: '3px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600 }}>
+                          ✗ Rejected
+                        </span>
+                      )}
+                    </div>
                   </td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
+    );
+  }
 
-      {showModal && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '800px' }}>
-            <div className="modal-header">
-              <h3>New Sales Target (CRM Module)</h3>
-              <XCircle className="modal-close" onClick={() => setShowModal(false)} />
-            </div>
-            <form onSubmit={handleCreate}>
-              <div className="grid-3">
-                <div className="form-group">
-                  <label className="form-label">Buyer *</label>
-                  <select className="form-control" value={form.buyer_id} onChange={e => setForm({ ...form, buyer_id: e.target.value })} required>
-                    <option value="">Select Buyer</option>
-                    {buyers.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Brand Name</label>
-                  <input type="text" className="form-control" value={form.brand} onChange={e => setForm({ ...form, brand: e.target.value })} placeholder="Brand" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Buying Agent</label>
-                  <input type="text" className="form-control" value={form.buying_agent} onChange={e => setForm({ ...form, buying_agent: e.target.value })} placeholder="Buying Agent" />
-                </div>
-              </div>
+  // ======================== CREATE VIEW ========================
+  if (subView === 'create') {
+    return (
+      <div className="dashboard-card">
+        {showConfirmPopup && <ConfirmPopup />}
+        <div className="card-header">
+          <h2 className="card-title"><Plus size={18} /> New Sales Target (CRM)</h2>
+          <button className="btn btn-secondary" onClick={() => setSubView('list')}>
+            <ArrowLeft size={16} /> Back to List
+          </button>
+        </div>
 
-              <div className="grid-3">
-                <div className="form-group">
-                  <label className="form-label">Buying Agent Merchant</label>
-                  <input type="text" className="form-control" value={form.buying_agent_merchant} onChange={e => setForm({ ...form, buying_agent_merchant: e.target.value })} placeholder="Merchant" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Team Leader *</label>
-                  <input type="text" className="form-control" value={form.team_leader} onChange={e => setForm({ ...form, team_leader: e.target.value })} required />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Season *</label>
-                  <input type="text" className="form-control" value={form.season} onChange={e => setForm({ ...form, season: e.target.value })} required placeholder="e.g. Summer 2026" />
-                </div>
-              </div>
+        <div style={{ marginBottom: '24px' }}>
+          <h4 style={{ color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-muted)', paddingBottom: '8px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <FileText size={16} /> Basic Information
+          </h4>
+          <HeaderForm />
+        </div>
 
-              <div className="grid-3">
-                <div className="form-group">
-                  <label className="form-label">Year *</label>
-                  <select className="form-control" value={form.year} onChange={e => setForm({ ...form, year: parseInt(e.target.value) })}>
-                    <option value="2026">2026</option>
-                    <option value="2027">2027</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Month *</label>
-                  <select className="form-control" value={form.month} onChange={e => setForm({ ...form, month: e.target.value })}>
-                    {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(m => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Status</label>
-                  <select className="form-control" value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
-                    <option value="Draft">Draft</option>
-                    <option value="Approved">Approved</option>
-                  </select>
-                </div>
-              </div>
+        <div>
+          <h4 style={{ color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-muted)', paddingBottom: '8px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Target size={16} /> Month Wise Target Details
+          </h4>
+          <MonthGrid editable={true} />
+        </div>
 
-              <h4 style={{ margin: '20px 0 10px 0', borderBottom: '1px solid var(--border-muted)', paddingBottom: '8px' }}>Month Wise Target Details</h4>
-              <div className="grid-3">
-                <div className="form-group">
-                  <label className="form-label">Basic Target Qty (Pcs)</label>
-                  <input type="number" className="form-control" value={form.target_basic_qty} onChange={e => setForm({ ...form, target_basic_qty: parseFloat(e.target.value) || 0 })} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Casual Basic Target Qty</label>
-                  <input type="number" className="form-control" value={form.target_casual_qty} onChange={e => setForm({ ...form, target_casual_qty: parseFloat(e.target.value) || 0 })} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Fashion Target Qty</label>
-                  <input type="number" className="form-control" value={form.target_fashion_qty} onChange={e => setForm({ ...form, target_fashion_qty: parseFloat(e.target.value) || 0 })} />
-                </div>
-              </div>
+        <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+          <button className="btn btn-secondary" onClick={() => setSubView('list')}>Cancel</button>
+          <button className="btn btn-primary" onClick={() => validateAndSubmit(handleCreate)}>
+            <Save size={16} /> Save Target
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-              <div className="grid-3">
-                <div className="form-group">
-                  <label className="form-label">Basic Target Value ($)</label>
-                  <input type="number" className="form-control" value={form.target_basic_val} onChange={e => setForm({ ...form, target_basic_val: parseFloat(e.target.value) || 0 })} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Casual Basic Target Value</label>
-                  <input type="number" className="form-control" value={form.target_casual_val} onChange={e => setForm({ ...form, target_casual_val: parseFloat(e.target.value) || 0 })} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Fashion Target Value</label>
-                  <input type="number" className="form-control" value={form.target_fashion_val} onChange={e => setForm({ ...form, target_fashion_val: parseFloat(e.target.value) || 0 })} />
-                </div>
-              </div>
+  // ======================== EDIT VIEW ========================
+  if (subView === 'edit' && selectedTarget) {
+    return (
+      <div className="dashboard-card">
+        {showConfirmPopup && <ConfirmPopup />}
+        <div className="card-header">
+          <h2 className="card-title"><Edit size={18} /> Edit Sales Target — {selectedTarget.style_id ? `REF#${selectedTarget.style_id}` : `ST-${String(selectedTarget.id).padStart(4, '0')}`}</h2>
+          <button className="btn btn-secondary" onClick={() => setSubView('list')}>
+            <ArrowLeft size={16} /> Back to List
+          </button>
+        </div>
 
-              <div className="mt-20 text-right">
-                <button type="button" className="btn btn-secondary mr-10" style={{ marginRight: '10px' }} onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary"><Save size={16} /> Save Target</button>
-              </div>
-            </form>
+        <div style={{ marginBottom: '8px', padding: '10px 16px', background: 'rgba(245,158,11,0.08)', borderRadius: '8px', border: '1px solid rgba(245,158,11,0.3)', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+          <AlertCircle size={14} style={{ display: 'inline', marginRight: '6px', color: '#f59e0b', verticalAlign: 'middle' }} />
+          Confirmed (locked) month rows cannot be changed. Only unlocked rows are editable.
+        </div>
+
+        <div style={{ marginBottom: '24px', marginTop: '16px' }}>
+          <h4 style={{ color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-muted)', paddingBottom: '8px', marginBottom: '16px' }}>
+            Basic Information
+          </h4>
+          <HeaderForm />
+        </div>
+
+        <div>
+          <h4 style={{ color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-muted)', paddingBottom: '8px', marginBottom: '16px' }}>
+            Month Wise Target Details
+          </h4>
+          <MonthGrid editable={true} />
+        </div>
+
+        <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+          <button className="btn btn-secondary" onClick={() => setSubView('list')}>Cancel</button>
+          <button className="btn btn-primary" onClick={() => validateAndSubmit(handleUpdate)}>
+            <Save size={16} /> Update Target
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ======================== VIEW PAGE ========================
+  if (subView === 'view' && selectedTarget) {
+    const months = selectedTarget.months || [];
+    return (
+      <div className="dashboard-card white-report-view">
+        <div className="card-header">
+          <h2 className="card-title"><Eye size={18} /> Sales Target Detail — {selectedTarget.style_id ? `REF#${selectedTarget.style_id}` : `ST-${String(selectedTarget.id).padStart(4, '0')}`}</h2>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '6px 14px' }}
+              onClick={async () => { await loadTargetForEdit(selectedTarget.id); setSubView('edit'); }}>
+              <Edit size={14} /> Edit
+            </button>
+            <button className="btn btn-secondary" onClick={() => setSubView('list')}>
+              <ArrowLeft size={16} /> Back
+            </button>
           </div>
         </div>
-      )}
-    </div>
-  );
+
+        {/* Basic Info Card */}
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px',
+          background: 'var(--bg-dark)', borderRadius: '12px', padding: '20px', marginBottom: '24px',
+          border: '1px solid var(--border-muted)'
+        }}>
+          {[
+            ['Year', selectedTarget.year],
+            ['Buyer', selectedTarget.buyer_name || '—'],
+            ['Style ID', selectedTarget.style_id || '—'],
+            ['Buying Agent', selectedTarget.buying_agent || '—'],
+            ['Buying Agent Merchant', selectedTarget.buying_agent_merchant || '—'],
+            ['Status', selectedTarget.status],
+            ['Created At', selectedTarget.created_at ? new Date(selectedTarget.created_at).toLocaleDateString() : '—'],
+          ].map(([label, val]) => (
+            <div key={label as string}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{label}</div>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.95rem' }}>{val}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Sales Target Details Table */}
+        <h4 style={{ color: 'var(--text-secondary)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Target size={16} /> Sales Target Details
+        </h4>
+        <div style={{ overflowX: 'auto' }}>
+          <table className="data-table" style={{ minWidth: '1500px' }}>
+            <thead>
+              <tr>
+                <th rowSpan={2} style={{ minWidth: '40px' }}>SL</th>
+                <th rowSpan={2} style={{ minWidth: '110px' }}>Month</th>
+                <th colSpan={5} style={{ textAlign: 'center', background: 'rgba(99,102,241,0.15)', borderBottom: '2px solid #6366f1' }}>Basic</th>
+                <th colSpan={5} style={{ textAlign: 'center', background: 'rgba(16,185,129,0.15)', borderBottom: '2px solid #10b981' }}>Casual Basic</th>
+                <th colSpan={5} style={{ textAlign: 'center', background: 'rgba(245,158,11,0.15)', borderBottom: '2px solid #f59e0b' }}>Fashion</th>
+                <th colSpan={5} style={{ textAlign: 'center', background: 'rgba(239,68,68,0.12)', borderBottom: '2px solid #ef4444' }}>Total</th>
+                <th rowSpan={2} style={{ minWidth: '80px' }}>Currency</th>
+              </tr>
+              <tr>
+                {['Tgt Qty', 'Tgt Val', 'Ach Qty', 'Ach Val', 'Ach %'].map(h => (
+                  <th key={`b-${h}`} style={{ background: 'rgba(99,102,241,0.08)', fontSize: '0.68rem' }}>{h}</th>
+                ))}
+                {['Tgt Qty', 'Tgt Val', 'Ach Qty', 'Ach Val', 'Ach %'].map(h => (
+                  <th key={`c-${h}`} style={{ background: 'rgba(16,185,129,0.08)', fontSize: '0.68rem' }}>{h}</th>
+                ))}
+                {['Tgt Qty', 'Tgt Val', 'Ach Qty', 'Ach Val', 'Ach %'].map(h => (
+                  <th key={`f-${h}`} style={{ background: 'rgba(245,158,11,0.08)', fontSize: '0.68rem' }}>{h}</th>
+                ))}
+                {['Total Qty', 'Total Val', 'Ach Qty', 'Ach Val', 'Ach %'].map(h => (
+                  <th key={`t-${h}`} style={{ background: 'rgba(239,68,68,0.06)', fontSize: '0.68rem', fontWeight: 700 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {months.map((m: any, idx: number) => {
+                const tQty = (m.target_basic_qty || 0) + (m.target_casual_qty || 0) + (m.target_fashion_qty || 0);
+                const tVal = (m.target_basic_val || 0) + (m.target_casual_val || 0) + (m.target_fashion_val || 0);
+                const aQty = (m.achieve_basic_qty || 0) + (m.achieve_casual_qty || 0) + (m.achieve_fashion_qty || 0);
+                const aVal = (m.achieve_basic_val || 0) + (m.achieve_casual_val || 0) + (m.achieve_fashion_val || 0);
+                const bAchPct = m.target_basic_qty ? ((m.achieve_basic_qty || 0) / m.target_basic_qty * 100) : 0;
+                const cAchPct = m.target_casual_qty ? ((m.achieve_casual_qty || 0) / m.target_casual_qty * 100) : 0;
+                const fAchPct = m.target_fashion_qty ? ((m.achieve_fashion_qty || 0) / m.target_fashion_qty * 100) : 0;
+                const totAchPct = tQty ? (aQty / tQty * 100) : 0;
+                const pct = (v: number) => <span style={{ color: v >= 100 ? 'var(--secondary)' : v > 0 ? '#f59e0b' : 'var(--text-muted)', fontWeight: 600 }}>{v.toFixed(1)}%</span>;
+                return (
+                  <tr key={idx} style={{ background: m.is_locked ? 'rgba(16,185,129,0.04)' : undefined }}>
+                    <td>{idx + 1}</td>
+                    <td style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      {m.is_locked ? <Lock size={11} style={{ color: 'var(--secondary)' }} /> : null}{m.month}
+                    </td>
+                    {/* Basic */}
+                    <td style={{ color: '#6366f1' }}>{(m.target_basic_qty || 0).toLocaleString()}</td>
+                    <td style={{ color: '#6366f1' }}>{(m.target_basic_val || 0).toLocaleString()}</td>
+                    <td>{(m.achieve_basic_qty || 0).toLocaleString()}</td>
+                    <td>{(m.achieve_basic_val || 0).toLocaleString()}</td>
+                    <td>{pct(bAchPct)}</td>
+                    {/* Casual */}
+                    <td style={{ color: '#10b981' }}>{(m.target_casual_qty || 0).toLocaleString()}</td>
+                    <td style={{ color: '#10b981' }}>{(m.target_casual_val || 0).toLocaleString()}</td>
+                    <td>{(m.achieve_casual_qty || 0).toLocaleString()}</td>
+                    <td>{(m.achieve_casual_val || 0).toLocaleString()}</td>
+                    <td>{pct(cAchPct)}</td>
+                    {/* Fashion */}
+                    <td style={{ color: '#f59e0b' }}>{(m.target_fashion_qty || 0).toLocaleString()}</td>
+                    <td style={{ color: '#f59e0b' }}>{(m.target_fashion_val || 0).toLocaleString()}</td>
+                    <td>{(m.achieve_fashion_qty || 0).toLocaleString()}</td>
+                    <td>{(m.achieve_fashion_val || 0).toLocaleString()}</td>
+                    <td>{pct(fAchPct)}</td>
+                    {/* Total */}
+                    <td style={{ fontWeight: 700 }}>{tQty.toLocaleString()}</td>
+                    <td style={{ fontWeight: 700 }}>{tVal.toLocaleString()}</td>
+                    <td style={{ color: 'var(--secondary)', fontWeight: 600 }}>{aQty.toLocaleString()}</td>
+                    <td style={{ color: 'var(--secondary)', fontWeight: 600 }}>{aVal.toLocaleString()}</td>
+                    <td>{pct(totAchPct)}</td>
+                    <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>USD</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr style={{ background: 'var(--bg-dark)', fontWeight: 700 }}>
+                <td colSpan={2}>GRAND TOTAL</td>
+                <td style={{ color: '#6366f1' }}>{months.reduce((s: number, m: any) => s + (m.target_basic_qty || 0), 0).toLocaleString()}</td>
+                <td style={{ color: '#6366f1' }}>{months.reduce((s: number, m: any) => s + (m.target_basic_val || 0), 0).toLocaleString()}</td>
+                <td>{months.reduce((s: number, m: any) => s + (m.achieve_basic_qty || 0), 0).toLocaleString()}</td>
+                <td>{months.reduce((s: number, m: any) => s + (m.achieve_basic_val || 0), 0).toLocaleString()}</td>
+                <td>—</td>
+                <td style={{ color: '#10b981' }}>{months.reduce((s: number, m: any) => s + (m.target_casual_qty || 0), 0).toLocaleString()}</td>
+                <td style={{ color: '#10b981' }}>{months.reduce((s: number, m: any) => s + (m.target_casual_val || 0), 0).toLocaleString()}</td>
+                <td>{months.reduce((s: number, m: any) => s + (m.achieve_casual_qty || 0), 0).toLocaleString()}</td>
+                <td>{months.reduce((s: number, m: any) => s + (m.achieve_casual_val || 0), 0).toLocaleString()}</td>
+                <td>—</td>
+                <td style={{ color: '#f59e0b' }}>{months.reduce((s: number, m: any) => s + (m.target_fashion_qty || 0), 0).toLocaleString()}</td>
+                <td style={{ color: '#f59e0b' }}>{months.reduce((s: number, m: any) => s + (m.target_fashion_val || 0), 0).toLocaleString()}</td>
+                <td>{months.reduce((s: number, m: any) => s + (m.achieve_fashion_qty || 0), 0).toLocaleString()}</td>
+                <td>{months.reduce((s: number, m: any) => s + (m.achieve_fashion_val || 0), 0).toLocaleString()}</td>
+                <td>—</td>
+                <td style={{ fontSize: '1rem' }}>
+                  {months.reduce((s: number, m: any) => s + (m.target_basic_qty || 0) + (m.target_casual_qty || 0) + (m.target_fashion_qty || 0), 0).toLocaleString()}
+                </td>
+                <td style={{ fontSize: '1rem' }}>
+                  {months.reduce((s: number, m: any) => s + (m.target_basic_val || 0) + (m.target_casual_val || 0) + (m.target_fashion_val || 0), 0).toLocaleString()}
+                </td>
+                <td style={{ color: 'var(--secondary)' }}>
+                  {months.reduce((s: number, m: any) => s + (m.achieve_basic_qty || 0) + (m.achieve_casual_qty || 0) + (m.achieve_fashion_qty || 0), 0).toLocaleString()}
+                </td>
+                <td style={{ color: 'var(--secondary)' }}>
+                  {months.reduce((s: number, m: any) => s + (m.achieve_basic_val || 0) + (m.achieve_casual_val || 0) + (m.achieve_fashion_val || 0), 0).toLocaleString()}
+                </td>
+                <td>—</td>
+                <td>USD</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 }
+
 
 // ==========================================================================
 // SUB-VIEW: CRM Sales Target vs Achievement MIS Report
 // ==========================================================================
 function SalesTargetMISView({ buyers: _buyers }: { buyers: any[] }) {
+  const [subView, setSubView] = useState<'list' | 'view'>('list');
+  const [selectedTarget, setSelectedTarget] = useState<any>(null);
   const [reportRows, setReportRows] = useState<any[]>([]);
+
+  const loadTargetForView = async (id: number) => {
+    try {
+      const res = await fetch(`${API_BASE}/sales-targets/${id}`);
+      const data = await res.json();
+      setSelectedTarget(data);
+      setSubView('view');
+    } catch (e) { console.error(e); }
+  };
+
+  const handleUpdateStatus = async (id: number, status: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/sales-targets/${id}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      if (res.ok) {
+        await fetchReport();
+      }
+    } catch (e) { console.error(e); }
+  };
   const [yearFilter, setYearFilter] = useState('2026');
-  const [brandFilter, setBrandFilter] = useState('');
+  const [searchFilter, setSearchFilter] = useState('');
+  const [filterMode, setFilterMode] = useState<'all' | 'year' | 'month'>('all');
+  const [selectedMonth, setSelectedMonth] = useState('');
+  const [simRole, setSimRole] = useState('Super Admin');
+  const [statusFilter, setStatusFilter] = useState('All');
 
   useEffect(() => {
     fetchReport();
-  }, [yearFilter, brandFilter]);
+  }, [yearFilter, searchFilter, filterMode, selectedMonth, statusFilter]);
 
   const fetchReport = async () => {
     try {
@@ -944,33 +1667,309 @@ function SalesTargetMISView({ buyers: _buyers }: { buyers: any[] }) {
 
       // Apply filters in frontend for convenience
       let filtered = data;
-      if (yearFilter) {
+
+      if (filterMode === 'year') {
         filtered = filtered.filter((r: any) => String(r.year) === yearFilter);
+      } else if (filterMode === 'month') {
+        if (selectedMonth) {
+          const [mYear, mMonth] = selectedMonth.split('-');
+          filtered = filtered.filter((r: any) =>
+            String(r.year) === mYear && String(r.month) === mMonth
+          );
+        }
       }
-      if (brandFilter) {
-        filtered = filtered.filter((r: any) => r.brand && r.brand.toLowerCase().includes(brandFilter.toLowerCase()));
+      // filterMode === 'all' → show everything
+
+      if (searchFilter) {
+        const q = searchFilter.trim().toLowerCase();
+        filtered = filtered.filter((r: any) =>
+          (r.brand || '').toLowerCase().includes(q) ||
+          (r.buyer_name || '').toLowerCase().includes(q)
+        );
       }
+
+      // Status filter
+      if (statusFilter !== 'All') {
+        filtered = filtered.filter((r: any) =>
+          (r.status || '').toLowerCase() === statusFilter.toLowerCase()
+        );
+      }
+
+      // Role-based visibility simulation
+      if (simRole === 'Merchandiser') {
+        const currentUser = (() => {
+          try { const s = localStorage.getItem('metamorphosis_user'); return s ? JSON.parse(s) : null; } catch { return null; }
+        })();
+        if (currentUser) {
+          filtered = filtered.filter((r: any) =>
+            (r.assigned_to || '').toLowerCase() === (currentUser.name || '').toLowerCase()
+          );
+        }
+      }
+
       setReportRows(filtered);
     } catch (e) { console.error("Error fetching MIS report", e); }
   };
 
+  // ======================== VIEW PAGE ========================
+  if (subView === 'view' && selectedTarget) {
+    const months = selectedTarget.months || [];
+    return (
+      <div className="dashboard-card white-report-view">
+        <div className="card-header">
+          <h2 className="card-title"><Eye size={18} /> Sales Target Detail — {selectedTarget.style_id ? `REF#${selectedTarget.style_id}` : `ST-${String(selectedTarget.id).padStart(4, '0')}`}</h2>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button className="btn btn-secondary" onClick={() => setSubView('list')}>
+              <ArrowLeft size={16} /> Back
+            </button>
+          </div>
+        </div>
+
+        {/* Basic Info Card */}
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px',
+          background: 'var(--bg-dark)', borderRadius: '12px', padding: '20px', marginBottom: '24px',
+          border: '1px solid var(--border-muted)'
+        }}>
+          {[
+            ['Year', selectedTarget.year],
+            ['Buyer', selectedTarget.buyer_name || '—'],
+            ['Style ID', selectedTarget.style_id || '—'],
+            ['Buying Agent', selectedTarget.buying_agent || '—'],
+            ['Buying Agent Merchant', selectedTarget.buying_agent_merchant || '—'],
+            ['Status', selectedTarget.status],
+            ['Created At', selectedTarget.created_at ? new Date(selectedTarget.created_at).toLocaleDateString() : '—'],
+          ].map(([label, val]) => (
+            <div key={label as string}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{label}</div>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.95rem' }}>{val}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Sales Target Details Table */}
+        <h4 style={{ color: 'var(--text-secondary)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Target size={16} /> Sales Target Details
+        </h4>
+        <div style={{ overflowX: 'auto' }}>
+          <table className="data-table" style={{ minWidth: '1500px' }}>
+            <thead>
+              <tr>
+                <th rowSpan={2} style={{ minWidth: '40px' }}>SL</th>
+                <th rowSpan={2} style={{ minWidth: '110px' }}>Month</th>
+                <th colSpan={5} style={{ textAlign: 'center', background: 'rgba(99,102,241,0.15)', borderBottom: '2px solid #6366f1' }}>Basic</th>
+                <th colSpan={5} style={{ textAlign: 'center', background: 'rgba(16,185,129,0.15)', borderBottom: '2px solid #10b981' }}>Casual Basic</th>
+                <th colSpan={5} style={{ textAlign: 'center', background: 'rgba(245,158,11,0.15)', borderBottom: '2px solid #f59e0b' }}>Fashion</th>
+                <th colSpan={5} style={{ textAlign: 'center', background: 'rgba(239,68,68,0.12)', borderBottom: '2px solid #ef4444' }}>Total</th>
+                <th rowSpan={2} style={{ minWidth: '80px' }}>Currency</th>
+              </tr>
+              <tr>
+                {['Tgt Qty', 'Tgt Val', 'Ach Qty', 'Ach Val', 'Ach %'].map(h => (
+                  <th key={`b-${h}`} style={{ background: 'rgba(99,102,241,0.08)', fontSize: '0.68rem' }}>{h}</th>
+                ))}
+                {['Tgt Qty', 'Tgt Val', 'Ach Qty', 'Ach Val', 'Ach %'].map(h => (
+                  <th key={`c-${h}`} style={{ background: 'rgba(16,185,129,0.08)', fontSize: '0.68rem' }}>{h}</th>
+                ))}
+                {['Tgt Qty', 'Tgt Val', 'Ach Qty', 'Ach Val', 'Ach %'].map(h => (
+                  <th key={`f-${h}`} style={{ background: 'rgba(245,158,11,0.08)', fontSize: '0.68rem' }}>{h}</th>
+                ))}
+                {['Total Qty', 'Total Val', 'Ach Qty', 'Ach Val', 'Ach %'].map(h => (
+                  <th key={`t-${h}`} style={{ background: 'rgba(239,68,68,0.06)', fontSize: '0.68rem', fontWeight: 700 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {months.map((m: any, idx: number) => {
+                const tQty = (m.target_basic_qty || 0) + (m.target_casual_qty || 0) + (m.target_fashion_qty || 0);
+                const tVal = (m.target_basic_val || 0) + (m.target_casual_val || 0) + (m.target_fashion_val || 0);
+                const aQty = (m.achieve_basic_qty || 0) + (m.achieve_casual_qty || 0) + (m.achieve_fashion_qty || 0);
+                const aVal = (m.achieve_basic_val || 0) + (m.achieve_casual_val || 0) + (m.achieve_fashion_val || 0);
+                const bAchPct = m.target_basic_qty ? ((m.achieve_basic_qty || 0) / m.target_basic_qty * 100) : 0;
+                const cAchPct = m.target_casual_qty ? ((m.achieve_casual_qty || 0) / m.target_casual_qty * 100) : 0;
+                const fAchPct = m.target_fashion_qty ? ((m.achieve_fashion_qty || 0) / m.target_fashion_qty * 100) : 0;
+                const totAchPct = tQty ? (aQty / tQty * 100) : 0;
+                const pct = (v: number) => <span style={{ color: v >= 100 ? 'var(--secondary)' : v > 0 ? '#f59e0b' : 'var(--text-muted)', fontWeight: 600 }}>{v.toFixed(1)}%</span>;
+                return (
+                  <tr key={idx} style={{ background: m.is_locked ? 'rgba(16,185,129,0.04)' : undefined }}>
+                    <td>{idx + 1}</td>
+                    <td style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      {m.is_locked ? <Lock size={11} style={{ color: 'var(--secondary)' }} /> : null}{m.month}
+                    </td>
+                    {/* Basic */}
+                    <td style={{ color: '#6366f1' }}>{(m.target_basic_qty || 0).toLocaleString()}</td>
+                    <td style={{ color: '#6366f1' }}>{(m.target_basic_val || 0).toLocaleString()}</td>
+                    <td>{(m.achieve_basic_qty || 0).toLocaleString()}</td>
+                    <td>{(m.achieve_basic_val || 0).toLocaleString()}</td>
+                    <td>{pct(bAchPct)}</td>
+                    {/* Casual */}
+                    <td style={{ color: '#10b981' }}>{(m.target_casual_qty || 0).toLocaleString()}</td>
+                    <td style={{ color: '#10b981' }}>{(m.target_casual_val || 0).toLocaleString()}</td>
+                    <td>{(m.achieve_casual_qty || 0).toLocaleString()}</td>
+                    <td>{(m.achieve_casual_val || 0).toLocaleString()}</td>
+                    <td>{pct(cAchPct)}</td>
+                    {/* Fashion */}
+                    <td style={{ color: '#f59e0b' }}>{(m.target_fashion_qty || 0).toLocaleString()}</td>
+                    <td style={{ color: '#f59e0b' }}>{(m.target_fashion_val || 0).toLocaleString()}</td>
+                    <td>{(m.achieve_fashion_qty || 0).toLocaleString()}</td>
+                    <td>{(m.achieve_fashion_val || 0).toLocaleString()}</td>
+                    <td>{pct(fAchPct)}</td>
+                    {/* Total */}
+                    <td style={{ fontWeight: 700 }}>{tQty.toLocaleString()}</td>
+                    <td style={{ fontWeight: 700 }}>{tVal.toLocaleString()}</td>
+                    <td style={{ color: 'var(--secondary)', fontWeight: 600 }}>{aQty.toLocaleString()}</td>
+                    <td style={{ color: 'var(--secondary)', fontWeight: 600 }}>{aVal.toLocaleString()}</td>
+                    <td>{pct(totAchPct)}</td>
+                    <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>USD</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr style={{ background: 'var(--bg-dark)', fontWeight: 700 }}>
+                <td colSpan={2}>GRAND TOTAL</td>
+                <td style={{ color: '#6366f1' }}>{months.reduce((s: number, m: any) => s + (m.target_basic_qty || 0), 0).toLocaleString()}</td>
+                <td style={{ color: '#6366f1' }}>{months.reduce((s: number, m: any) => s + (m.target_basic_val || 0), 0).toLocaleString()}</td>
+                <td>{months.reduce((s: number, m: any) => s + (m.achieve_basic_qty || 0), 0).toLocaleString()}</td>
+                <td>{months.reduce((s: number, m: any) => s + (m.achieve_basic_val || 0), 0).toLocaleString()}</td>
+                <td>—</td>
+                <td style={{ color: '#10b981' }}>{months.reduce((s: number, m: any) => s + (m.target_casual_qty || 0), 0).toLocaleString()}</td>
+                <td style={{ color: '#10b981' }}>{months.reduce((s: number, m: any) => s + (m.target_casual_val || 0), 0).toLocaleString()}</td>
+                <td>{months.reduce((s: number, m: any) => s + (m.achieve_casual_qty || 0), 0).toLocaleString()}</td>
+                <td>{months.reduce((s: number, m: any) => s + (m.achieve_casual_val || 0), 0).toLocaleString()}</td>
+                <td>—</td>
+                <td style={{ color: '#f59e0b' }}>{months.reduce((s: number, m: any) => s + (m.target_fashion_qty || 0), 0).toLocaleString()}</td>
+                <td style={{ color: '#f59e0b' }}>{months.reduce((s: number, m: any) => s + (m.target_fashion_val || 0), 0).toLocaleString()}</td>
+                <td>{months.reduce((s: number, m: any) => s + (m.achieve_fashion_qty || 0), 0).toLocaleString()}</td>
+                <td>{months.reduce((s: number, m: any) => s + (m.achieve_fashion_val || 0), 0).toLocaleString()}</td>
+                <td>—</td>
+                <td style={{ fontSize: '1rem' }}>
+                  {months.reduce((s: number, m: any) => s + (m.target_basic_qty || 0) + (m.target_casual_qty || 0) + (m.target_fashion_qty || 0), 0).toLocaleString()}
+                </td>
+                <td style={{ fontSize: '1rem' }}>
+                  {months.reduce((s: number, m: any) => s + (m.target_basic_val || 0) + (m.target_casual_val || 0) + (m.target_fashion_val || 0), 0).toLocaleString()}
+                </td>
+                <td style={{ color: 'var(--secondary)' }}>
+                  {months.reduce((s: number, m: any) => s + (m.achieve_basic_qty || 0) + (m.achieve_casual_qty || 0) + (m.achieve_fashion_qty || 0), 0).toLocaleString()}
+                </td>
+                <td style={{ color: 'var(--secondary)' }}>
+                  {months.reduce((s: number, m: any) => s + (m.achieve_basic_val || 0) + (m.achieve_casual_val || 0) + (m.achieve_fashion_val || 0), 0).toLocaleString()}
+                </td>
+                <td>—</td>
+                <td>USD</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="dashboard-card">
-      <div className="card-header">
-        <h2 className="card-title"><TrendingUp /> Target vs Achievement (MIS Analysis)</h2>
-        <div className="d-flex gap-10">
-          <select className="form-control" style={{ width: '120px' }} value={yearFilter} onChange={e => setYearFilter(e.target.value)}>
-            <option value="2026">2026</option>
-            <option value="2027">2027</option>
-          </select>
-          <input
-            type="text"
-            className="form-control"
-            style={{ width: '180px' }}
-            placeholder="Search Brand..."
-            value={brandFilter}
-            onChange={e => setBrandFilter(e.target.value)}
-          />
+      <div className="card-header" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '15px' }}>
+          <h2 className="card-title"><TrendingUp /> Target vs Achievement (MIS Analysis)</h2>
+          <div style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
+
+            {/* Filter Mode */}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <label style={{ fontWeight: 'bold', fontSize: '13px', color: 'var(--text-secondary)' }}>Filter Mode:</label>
+              <select
+                className="form-control"
+                style={{ width: 'auto', padding: '6px 12px', fontSize: '13px' }}
+                value={filterMode}
+                onChange={(e) => {
+                  setFilterMode(e.target.value as any);
+                  setSelectedMonth('');
+                  setYearFilter(String(new Date().getFullYear()));
+                }}
+              >
+                <option value="all">Show All Targets</option>
+                <option value="year">By Specific Year</option>
+                <option value="month">By Specific Month</option>
+              </select>
+            </div>
+
+            {/* Simulate Role */}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <label style={{ fontWeight: 'bold', fontSize: '13px', color: 'var(--text-secondary)' }}>Simulate Role:</label>
+              <select
+                className="form-control"
+                style={{ width: 'auto', padding: '6px 12px', fontSize: '13px' }}
+                value={simRole}
+                onChange={(e) => setSimRole(e.target.value)}
+              >
+                <option value="Super Admin">Super Admin</option>
+                <option value="Production Manager">Production Manager</option>
+                <option value="Store Manager">Store Manager</option>
+                <option value="Merchandising Manager">Merchandising Manager</option>
+                <option value="Merchandiser">Merchandiser</option>
+                <option value="Others">Others (Buyer)</option>
+              </select>
+            </div>
+
+          </div>
+        </div>
+
+        {/* Search & Filter Bar — CRM style */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '4px 0' }}>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+
+            {/* Search Input */}
+            <div style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
+              <Search size={16} style={{ position: 'absolute', left: '12px', top: '10px', color: 'var(--text-muted)' }} />
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Search by Buyer and Brand..."
+                value={searchFilter}
+                onChange={e => setSearchFilter(e.target.value)}
+                style={{ paddingLeft: '36px', height: '36px', background: 'var(--bg-input)', border: '1px solid var(--border-muted)', borderRadius: '6px', color: 'var(--text-primary)' }}
+              />
+            </div>
+
+            {/* Status filter */}
+            <select
+              className="form-control"
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              style={{ width: '180px', height: '36px', background: 'var(--bg-input)', border: '1px solid var(--border-muted)', borderRadius: '6px', color: 'var(--text-primary)' }}
+            >
+              <option value="All">All Statuses</option>
+              <option value="Draft">Draft</option>
+              <option value="Approved">Approved</option>
+            </select>
+
+            {/* Year picker (when filterMode === year) */}
+            {filterMode === 'year' && (
+              <select
+                className="form-control"
+                value={yearFilter}
+                onChange={e => setYearFilter(e.target.value)}
+                style={{ width: '130px', height: '36px', background: 'var(--bg-input)', border: '1px solid var(--border-muted)', borderRadius: '6px', color: 'var(--text-primary)' }}
+              >
+                <option value="2025">2025</option>
+                <option value="2026">2026</option>
+                <option value="2027">2027</option>
+              </select>
+            )}
+
+            {/* Month picker (when filterMode === month) */}
+            {filterMode === 'month' && (
+              <input
+                type="month"
+                className="form-control"
+                value={selectedMonth}
+                onChange={e => setSelectedMonth(e.target.value)}
+                style={{ width: '170px', height: '36px', background: 'var(--bg-input)', border: '1px solid var(--border-muted)', borderRadius: '6px', color: 'var(--text-primary)' }}
+              />
+            )}
+
+            {/* Count */}
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: '500', whiteSpace: 'nowrap' }}>
+              Found {reportRows.length} Target{reportRows.length !== 1 ? 's' : ''}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -991,11 +1990,12 @@ function SalesTargetMISView({ buyers: _buyers }: { buyers: any[] }) {
               <th>Target Value</th>
               <th>Confirm Ach Value</th>
               <th>Ach Value %</th>
+              <th>Action</th>
             </tr>
           </thead>
           <tbody>
             {reportRows.map((r, idx) => {
-              const basicAchPct = r.target_basic_qty > 0 ? (r.confirm_qty / r.target_qty) * 100 : 0; // estimate
+              const basicAchPct = r.target_basic_qty > 0 ? (r.confirm_qty / r.target_qty) * 100 : 0;
               const casualAchPct = r.target_casual_qty > 0 ? (r.confirm_qty / r.target_qty) * 100 : 0;
               const fashionAchPct = r.target_fashion_qty > 0 ? (r.confirm_qty / r.target_qty) * 100 : 0;
               const totalValPct = r.target_value > 0 ? (r.confirm_value / r.target_value) * 100 : 0;
@@ -1023,6 +2023,37 @@ function SalesTargetMISView({ buyers: _buyers }: { buyers: any[] }) {
                   <td style={{ fontWeight: 600, color: totalValPct >= 100 ? 'var(--secondary)' : 'var(--warning)' }}>
                     {totalValPct.toFixed(1)}%
                   </td>
+                  <td>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'nowrap', alignItems: 'center' }}>
+                      <button className="btn btn-xs" style={{ padding: '3px 8px', background: 'rgba(99,102,241,0.15)', color: '#6366f1', border: '1px solid #6366f1', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 600 }}
+                        title="View Details" onClick={() => loadTargetForView(r.id)}>
+                        <Eye size={12} /> View
+                      </button>
+                      {r.status === 'Submitted' && (
+                        <>
+                          <button className="btn btn-xs" style={{ padding: '3px 8px', background: 'rgba(16,185,129,0.15)', color: '#10b981', border: '1px solid #10b981', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 600 }}
+                            title="Approve" onClick={() => { if (confirm('Approve this Sales Target?')) handleUpdateStatus(r.id, 'Approved'); }}>
+                            ✓ Approve
+                          </button>
+                          <button className="btn btn-xs" style={{ padding: '3px 8px', background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: '1px solid #ef4444', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 600 }}
+                            title="Reject" onClick={() => { if (confirm('Reject this Sales Target?')) handleUpdateStatus(r.id, 'Rejected'); }}>
+                            ✗ Reject
+                          </button>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500, marginLeft: '4px' }}>⏳ Pending</span>
+                        </>
+                      )}
+                      {r.status === 'Approved' && (
+                        <span className="badge badge-approved" style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981', border: '1px solid #10b981', padding: '3px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600 }}>
+                          ✓ Approved
+                        </span>
+                      )}
+                      {r.status === 'Rejected' && (
+                        <span className="badge badge-rejected" style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: '1px solid #ef4444', padding: '3px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600 }}>
+                          ✗ Rejected
+                        </span>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               );
             })}
@@ -1032,6 +2063,7 @@ function SalesTargetMISView({ buyers: _buyers }: { buyers: any[] }) {
     </div>
   );
 }
+
 
 // ==========================================================================
 // SUB-VIEW: Quotation Module (Wraps Buyer Inquiry & Price Quotation)
@@ -10770,7 +11802,7 @@ function OrderApprovalView({ buyers, setActiveTab, setEditOrderId }: { buyers: a
 
     const orderStatus = o.status || 'Draft';
     if (inqStatusFilter === 'Pending Approval') {
-      return matchesSearch && (orderStatus === 'Pending Approval' || orderStatus === 'Pending');
+      return matchesSearch && (orderStatus === 'Pending Approval' || orderStatus === 'Pending' || orderStatus === 'Approved' || orderStatus === 'Rejected');
     }
     return matchesSearch && orderStatus === inqStatusFilter;
   });
@@ -14061,7 +15093,7 @@ function LoginSignupView({ onLoginSuccess }: { onLoginSuccess: (user: any) => vo
           }}>
             M
           </div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, letterSpacing: '0.05em', margin: '5px 0' }}>METAMORPHOSIS</h2>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, letterSpacing: '0.05em', margin: '5px 0' }}>MerchTrack</h2>
           <p style={{ color: '#94a3b8', fontSize: '0.9rem', margin: '2px 0' }}>Enterprise Garments Merchandising ERP</p>
         </div>
 
@@ -14473,9 +15505,7 @@ function UserManagementView({ currentUser, rolePermissions, userPermissions, fet
   };
 
   const handleToggleDisable = async (u: any) => {
-    const newDisabled = u.disabled === 1 ? 0 : 1;
-    const actionText = newDisabled === 1 ? "disable" : "enable";
-    if (!window.confirm(`Are you sure you want to ${actionText} this user?`)) return;
+    const newDisabled = u.disabled == 1 ? 0 : 1;
 
     try {
       const res = await fetch(`${API_BASE}/users/${u.id}`, {
@@ -14484,13 +15514,12 @@ function UserManagementView({ currentUser, rolePermissions, userPermissions, fet
         body: JSON.stringify({ disabled: newDisabled })
       });
       if (res.ok) {
-        alert(`User account ${newDisabled === 1 ? "disabled" : "enabled"} successfully!`);
         fetchUsers();
       } else {
-        alert("Failed to toggle user status");
+        console.error("Failed to toggle user status");
       }
     } catch (e) {
-      alert("Error connecting to server");
+      console.error("Error connecting to server", e);
     }
   };
 
